@@ -1,4 +1,4 @@
-// game.js - Core Game Logic
+// game.js - Core Game Logic (FIXED)
 
 const Game = (function() {
     // Game constants
@@ -23,7 +23,8 @@ const Game = (function() {
         isHost: false,
         myPlayerNumber: null,
         db: null,
-        roomRef: null
+        roomRef: null,
+        roomListener: null
     };
     
     // Timer variables
@@ -62,28 +63,71 @@ const Game = (function() {
         board.addEventListener('click', handleBoardClick);
         board.addEventListener('mouseover', handleBoardHover);
         board.addEventListener('mouseout', handleBoardHoverOut);
+        
+        // Touch events for mobile
+        board.addEventListener('touchstart', handleTouchStart, { passive: true });
     }
     
-    // Render board
+    // Handle touch start (mobile)
+    function handleTouchStart(e) {
+        const touch = e.touches[0];
+        const element = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (element && element.classList.contains('cell')) {
+            const col = parseInt(element.dataset.col);
+            selectColumn(col);
+        }
+    }
+    
+    // Render board (FIXED: Prevent re-animation of existing discs)
     function renderBoard() {
         const boardEl = document.getElementById('gameBoard');
-        boardEl.innerHTML = '';
         
+        // Instead of innerHTML, update cells individually
+        const cells = boardEl.querySelectorAll('.cell');
+        
+        // If board is empty or cells don't exist, create them
+        if (cells.length === 0) {
+            boardEl.innerHTML = '';
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+        
+        // Update cells without re-creating
         for (let row = 0; row < ROWS; row++) {
             for (let col = 0; col < COLS; col++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.dataset.row = row;
-                cell.dataset.col = col;
+                const index = row * COLS + col;
+                const cell = boardEl.children[index];
+                const value = state.board[row][col];
                 
-                if (state.board[row][col] !== 0) {
+                // Only update if changed
+                const hasDisc = cell.querySelector('.watermelon-disc');
+                
+                if (value === 0 && hasDisc) {
+                    // Remove disc
+                    cell.classList.remove('filled');
+                    cell.innerHTML = '';
+                } else if (value !== 0 && !hasDisc) {
+                    // Add new disc (only animate new ones)
                     cell.classList.add('filled');
                     const disc = document.createElement('div');
-                    disc.className = `watermelon-disc watermelon-player${state.board[row][col]}`;
+                    disc.className = `watermelon-disc watermelon-player${value} new-disc`;
                     cell.appendChild(disc);
+                    
+                    // Remove new-disc class after animation
+                    setTimeout(() => {
+                        disc.classList.remove('new-disc');
+                    }, 500);
+                } else if (value !== 0 && hasDisc) {
+                    // Disc already exists, ensure correct player class
+                    hasDisc.className = `watermelon-disc watermelon-player${value}`;
                 }
-                
-                boardEl.appendChild(cell);
             }
         }
         
@@ -164,13 +208,17 @@ const Game = (function() {
         SoundManager.play('drop');
         renderBoard();
         
-        // Animate the drop
-        animateDisc(row, col);
-        
         // Check for win
         if (checkWin(row, col)) {
+            if (state.mode === 'online') {
+                // Send final move to Firebase before ending
+                sendMoveToFirebase(row, col, true);
+            }
             endGame(state.currentPlayer);
         } else if (checkDraw()) {
+            if (state.mode === 'online') {
+                sendMoveToFirebase(row, col, false, true);
+            }
             endGame(0);
         } else {
             // Switch players
@@ -303,20 +351,13 @@ const Game = (function() {
         // Update status text
         const statusText = document.getElementById('statusText');
         const currentPlayerName = state.currentPlayer === 1 ? state.player1.name : state.player2.name;
-        statusText.textContent = `${currentPlayerName}'s Turn`;
-    }
-    
-    // Animate disc drop
-    function animateDisc(row, col) {
-        const index = row * COLS + col;
-        const cell = document.querySelectorAll('.cell')[index];
-        const disc = cell.querySelector('.watermelon-disc');
         
-        if (disc) {
-            disc.style.animation = 'none';
-            setTimeout(() => {
-                disc.style.animation = '';
-            }, 10);
+        if (state.mode === 'online' && state.currentPlayer === state.myPlayerNumber) {
+            statusText.textContent = 'Your Turn';
+        } else if (state.mode === 'online') {
+            statusText.textContent = `${currentPlayerName}'s Turn`;
+        } else {
+            statusText.textContent = `${currentPlayerName}'s Turn`;
         }
     }
     
@@ -462,7 +503,7 @@ const Game = (function() {
         }, 1000);
     }
     
-    // Create online room
+    // Create online room (FIXED)
     async function createOnlineRoom(playerName) {
         if (!firebase.apps.length) {
             throw new Error('Firebase not initialized');
@@ -474,6 +515,11 @@ const Game = (function() {
         state.myPlayerNumber = 1;
         state.player1.name = playerName;
         
+        // Clean up any existing listener
+        if (state.roomListener && state.roomRef) {
+            state.roomRef.off('value', state.roomListener);
+        }
+        
         state.roomRef = state.db.ref(`rooms/${state.roomCode}`);
         
         await state.roomRef.set({
@@ -484,16 +530,19 @@ const Game = (function() {
             currentPlayer: 1,
             gameActive: false,
             lastMove: null,
-            created: Date.now()
+            created: Date.now(),
+            gameStarted: false
         });
         
         // Listen for changes
-        state.roomRef.on('value', handleRoomUpdate);
+        state.roomListener = state.roomRef.on('value', (snapshot) => {
+            handleRoomUpdate(snapshot);
+        });
         
         return state.roomCode;
     }
     
-    // Join online room
+    // Join online room (FIXED)
     async function joinOnlineRoom(roomCode, playerName) {
         if (!firebase.apps.length) {
             throw new Error('Firebase not initialized');
@@ -504,6 +553,11 @@ const Game = (function() {
         state.isHost = false;
         state.myPlayerNumber = 2;
         state.player2.name = playerName;
+        
+        // Clean up any existing listener
+        if (state.roomListener && state.roomRef) {
+            state.roomRef.off('value', state.roomListener);
+        }
         
         state.roomRef = state.db.ref(`rooms/${roomCode}`);
         
@@ -520,40 +574,63 @@ const Game = (function() {
         
         state.player1.name = data.player1;
         
+        // Update room with player 2 and start game
         await state.roomRef.update({
             player2: playerName,
-            gameActive: true
+            gameActive: true,
+            gameStarted: true
         });
         
         // Listen for changes
-        state.roomRef.on('value', handleRoomUpdate);
+        state.roomListener = state.roomRef.on('value', (snapshot) => {
+            handleRoomUpdate(snapshot);
+        });
         
         // Update UI
         document.getElementById('p1Name').textContent = state.player1.name;
         document.getElementById('p2Name').textContent = state.player2.name;
         
-        // Start game
+        // Start game for player 2
         start();
+        
+        return true;
     }
     
-    // Handle room updates from Firebase
+    // Handle room updates from Firebase (FIXED)
     function handleRoomUpdate(snapshot) {
         const data = snapshot.val();
         if (!data) return;
         
         // Update players
-        if (data.player2 && !state.player2.name) {
-            state.player2.name = data.player2;
-            document.getElementById('p2Name').textContent = data.player2;
-            
-            if (state.isHost) {
-                // Both players joined, start game
-                document.getElementById('setupModal').classList.remove('active');
-                document.getElementById('gameArea').classList.add('active');
-                start();
+        if (data.player2) {
+            if (!state.player2.name || state.player2.name !== data.player2) {
+                state.player2.name = data.player2;
+                document.getElementById('p2Name').textContent = data.player2;
                 
-                App.showToast(`${data.player2} joined the game!`, 'success');
+                if (state.isHost) {
+                    // Both players joined, start game for host
+                    document.getElementById('setupModal').classList.remove('active');
+                    document.getElementById('gameArea').classList.add('active');
+                    
+                    // Update Firebase to notify player 2
+                    state.roomRef.update({ gameStarted: true });
+                    
+                    start();
+                    App.showToast(`${data.player2} joined the game!`, 'success');
+                }
             }
+        }
+        
+        // Start game for player 2 if not started yet
+        if (!state.isHost && data.gameStarted && !state.gameActive) {
+            document.getElementById('setupModal').classList.remove('active');
+            document.getElementById('gameArea').classList.add('active');
+            start();
+        }
+        
+        // Update game state
+        if (data.gameActive !== undefined) {
+            state.gameActive = data.gameActive;
         }
         
         // Update board if changed by opponent
@@ -564,19 +641,20 @@ const Game = (function() {
             state.moveCount++;
             
             renderBoard();
-            animateDisc(move.row, move.col);
             SoundManager.play('drop');
             
-            if (checkWin(move.row, move.col)) {
+            if (move.isWin) {
                 endGame(move.player);
-            } else if (checkDraw()) {
+            } else if (move.isDraw) {
                 endGame(0);
+            } else {
+                updatePlayerIndicator();
             }
         }
     }
     
-    // Send move to Firebase
-    async function sendMoveToFirebase(row, col) {
+    // Send move to Firebase (FIXED)
+    async function sendMoveToFirebase(row, col, isWin = false, isDraw = false) {
         if (!state.roomRef) return;
         
         await state.roomRef.update({
@@ -585,7 +663,9 @@ const Game = (function() {
             lastMove: {
                 row: row,
                 col: col,
-                player: state.myPlayerNumber
+                player: state.myPlayerNumber,
+                isWin: isWin,
+                isDraw: isDraw
             }
         });
     }
