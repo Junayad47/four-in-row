@@ -609,8 +609,12 @@ body {
     height: 85%;
     border-radius: 50%;
     position: relative;
-    animation: dropIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     transform-style: preserve-3d;
+}
+
+/* Only animate new discs */
+.watermelon-disc.new-disc {
+    animation: dropIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 @keyframes dropIn {
@@ -621,6 +625,20 @@ body {
     to {
         transform: translateY(0) rotate(0deg) scale(1);
         opacity: 1;
+    }
+}
+
+/* Disable animations on mobile for better performance */
+@media (max-width: 768px) {
+    .watermelon-disc.new-disc {
+        animation-duration: 0.3s;
+    }
+}
+
+/* Prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .watermelon-disc.new-disc {
+        animation: none;
     }
 }
 
