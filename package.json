@@ -1,0 +1,28 @@
+{
+  "name": "four-in-row-cyberpunk",
+  "version": "1.0.0",
+  "description": "Four in a Row - Cyberpunk Watermelon Edition: A stunning neon-styled game with local and online multiplayer",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "build": "echo 'No build required for static site'",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "game",
+    "four-in-a-row",
+    "connect-four",
+    "cyberpunk",
+    "multiplayer",
+    "pwa",
+    "watermelon"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
