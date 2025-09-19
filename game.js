@@ -304,7 +304,7 @@
         // Check for win
         if (checkWin(row, col, true)) {
             if (state.mode === 'online') {
-                sendMoveToFirebase(row, col, true);
+                sendMoveToFirebase(row, col, true, false);
             }
             endGame(state.currentPlayer);
         } else if (checkDraw()) {
@@ -313,14 +313,16 @@
             }
             endGame(0);
         } else {
-            // Switch players
+            // Switch players BEFORE sending to Firebase
+            const previousPlayer = state.currentPlayer;
             state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
-            updatePlayerIndicator();
             
-            // For online mode, send move to Firebase
+            // For online mode, send move to Firebase with new current player
             if (state.mode === 'online') {
-                sendMoveToFirebase(row, col);
+                sendMoveToFirebase(row, col, false, false);
             }
+            
+            updatePlayerIndicator();
         }
     }
     
@@ -759,6 +761,12 @@
             showToast(`${data.player2} joined the game!`, 'success');
         }
         
+        // Update current player from Firebase
+        if (data.currentPlayer !== undefined) {
+            state.currentPlayer = data.currentPlayer;
+            updatePlayerIndicator();
+        }
+        
         // Update game state
         if (data.gameActive !== undefined) {
             state.gameActive = data.gameActive;
@@ -769,8 +777,10 @@
             const move = data.lastMove;
             state.board[move.row][move.col] = move.player;
             state.lastDroppedCell = { row: move.row, col: move.col };
-            state.currentPlayer = data.currentPlayer;
             state.moveCount++;
+            
+            // Update current player to match Firebase state
+            state.currentPlayer = data.currentPlayer;
             
             renderBoard(true);
             playSound('drop');
@@ -789,17 +799,23 @@
     async function sendMoveToFirebase(row, col, isWin = false, isDraw = false) {
         if (!state.roomRef) return;
         
-        await state.roomRef.update({
-            board: state.board,
-            currentPlayer: state.currentPlayer,
-            lastMove: {
-                row: row,
-                col: col,
-                player: state.myPlayerNumber,
-                isWin: isWin,
-                isDraw: isDraw
-            }
-        });
+        try {
+            await state.roomRef.update({
+                board: state.board,
+                currentPlayer: state.currentPlayer, // This is already the NEXT player
+                lastMove: {
+                    row: row,
+                    col: col,
+                    player: state.myPlayerNumber, // Who made the move
+                    isWin: isWin,
+                    isDraw: isDraw,
+                    timestamp: Date.now()
+                }
+            });
+        } catch (error) {
+            console.error('Error sending move to Firebase:', error);
+            showToast('Failed to send move. Please check connection.', 'error');
+        }
     }
     
     // Generate room code
