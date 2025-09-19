@@ -1,6 +1,8 @@
-// game.js - Core Game Logic (COMPLETELY FIXED)
+// game.js - Core Game Logic (COMPLETE VERSION)
 
-const Game = (function() {
+(function(window) {
+    'use strict';
+    
     // Game constants
     const ROWS = 6;
     const COLS = 7;
@@ -18,7 +20,7 @@ const Game = (function() {
         pendingMove: null,
         startTime: null,
         moveCount: 0,
-        lastPlacedCell: null, // Track last placed disc for animation
+        lastDroppedCell: null, // Track only the last dropped disc
         // Online specific
         roomCode: null,
         isHost: false,
@@ -41,8 +43,8 @@ const Game = (function() {
     // Initialize empty board
     function initializeBoard() {
         state.board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
-        state.lastPlacedCell = null;
-        renderBoard();
+        state.lastDroppedCell = null;
+        renderBoard(false); // Don't animate on init
     }
     
     // Setup column indicators
@@ -65,15 +67,18 @@ const Game = (function() {
         const board = document.getElementById('gameBoard');
         if (!board) return;
         
-        board.addEventListener('click', handleBoardClick);
-        board.addEventListener('mouseover', handleBoardHover);
-        board.addEventListener('mouseout', handleBoardHoverOut);
+        // Remove old listeners
+        const newBoard = board.cloneNode(true);
+        board.parentNode.replaceChild(newBoard, board);
         
-        // Touch events for mobile
-        board.addEventListener('touchstart', handleTouchStart, { passive: true });
+        // Add new listeners
+        newBoard.addEventListener('click', handleBoardClick);
+        newBoard.addEventListener('mouseover', handleBoardHover);
+        newBoard.addEventListener('mouseout', handleBoardHoverOut);
+        newBoard.addEventListener('touchstart', handleTouchStart, { passive: true });
     }
     
-    // Handle touch start (mobile)
+    // Handle touch start
     function handleTouchStart(e) {
         const touch = e.touches[0];
         const element = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -83,47 +88,137 @@ const Game = (function() {
         }
     }
     
-    // Render board - FIXED to only animate new disc
-    function renderBoard() {
+    // Render board - FIXED to only animate the last dropped disc
+    function renderBoard(animateLastDrop = true) {
         const boardEl = document.getElementById('gameBoard');
         if (!boardEl) return;
         
-        // Clear and rebuild board
-        boardEl.innerHTML = '';
+        // Store existing cells to avoid recreating
+        const existingCells = boardEl.querySelectorAll('.cell');
+        const shouldRebuild = existingCells.length !== ROWS * COLS;
         
-        for (let row = 0; row < ROWS; row++) {
-            for (let col = 0; col < COLS; col++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.dataset.row = row;
-                cell.dataset.col = col;
-                
-                if (state.board[row][col] !== 0) {
-                    cell.classList.add('filled');
-                    const disc = document.createElement('div');
+        if (shouldRebuild) {
+            // Full rebuild only if necessary
+            boardEl.innerHTML = '';
+            
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
                     
-                    // Only animate the last placed disc
-                    if (state.lastPlacedCell && 
-                        state.lastPlacedCell.row === row && 
-                        state.lastPlacedCell.col === col) {
-                        disc.className = `watermelon-disc watermelon-player${state.board[row][col]} animate-drop`;
-                        // Remove animation class after animation completes
-                        setTimeout(() => {
-                            disc.classList.remove('animate-drop');
-                        }, 500);
-                        state.lastPlacedCell = null; // Reset after animating
-                    } else {
-                        disc.className = `watermelon-disc watermelon-player${state.board[row][col]}`;
+                    if (state.board[row][col] !== 0) {
+                        cell.classList.add('filled');
+                        const disc = document.createElement('div');
+                        
+                        // Only animate if this is the last dropped disc
+                        const shouldAnimate = animateLastDrop && 
+                                            state.lastDroppedCell && 
+                                            state.lastDroppedCell.row === row && 
+                                            state.lastDroppedCell.col === col;
+                        
+                        if (shouldAnimate) {
+                            disc.className = `watermelon-disc watermelon-player${state.board[row][col]} drop-animation`;
+                        } else {
+                            disc.className = `watermelon-disc watermelon-player${state.board[row][col]}`;
+                        }
+                        
+                        cell.appendChild(disc);
                     }
                     
-                    cell.appendChild(disc);
+                    boardEl.appendChild(cell);
                 }
-                
-                boardEl.appendChild(cell);
+            }
+        } else {
+            // Update existing cells
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    const index = row * COLS + col;
+                    const cell = existingCells[index];
+                    const value = state.board[row][col];
+                    const currentDisc = cell.querySelector('.watermelon-disc');
+                    
+                    if (value === 0 && currentDisc) {
+                        // Remove disc
+                        cell.classList.remove('filled');
+                        cell.innerHTML = '';
+                    } else if (value !== 0 && !currentDisc) {
+                        // Add new disc
+                        cell.classList.add('filled');
+                        const disc = document.createElement('div');
+                        
+                        // Only animate if this is the last dropped disc
+                        const shouldAnimate = animateLastDrop && 
+                                            state.lastDroppedCell && 
+                                            state.lastDroppedCell.row === row && 
+                                            state.lastDroppedCell.col === col;
+                        
+                        if (shouldAnimate) {
+                            disc.className = `watermelon-disc watermelon-player${value} drop-animation`;
+                        } else {
+                            disc.className = `watermelon-disc watermelon-player${value}`;
+                        }
+                        
+                        cell.appendChild(disc);
+                    }
+                }
             }
         }
         
+        // Check for danger moves (opponent can win)
+        checkForDangerMoves();
         updatePlayerIndicator();
+        
+        // Clear last dropped cell after rendering
+        if (animateLastDrop) {
+            setTimeout(() => {
+                state.lastDroppedCell = null;
+            }, 500);
+        }
+    }
+    
+    // Check for danger moves - RESTORED FEATURE
+    function checkForDangerMoves() {
+        if (!state.gameActive) return;
+        
+        const cells = document.querySelectorAll('.cell');
+        
+        // Clear previous danger indicators
+        cells.forEach(cell => {
+            cell.classList.remove('danger');
+            cell.classList.remove('win-opportunity');
+        });
+        
+        const opponent = state.currentPlayer === 1 ? 2 : 1;
+        
+        // Check if opponent can win (danger)
+        for (let col = 0; col < COLS; col++) {
+            const row = getLowestEmptyRow(col);
+            if (row === -1) continue;
+            
+            // Simulate opponent's move
+            state.board[row][col] = opponent;
+            if (checkWin(row, col, false)) {
+                const index = row * COLS + col;
+                cells[index].classList.add('danger');
+            }
+            state.board[row][col] = 0; // Undo simulation
+        }
+        
+        // Check if current player can win (opportunity)
+        for (let col = 0; col < COLS; col++) {
+            const row = getLowestEmptyRow(col);
+            if (row === -1) continue;
+            
+            // Simulate current player's move
+            state.board[row][col] = state.currentPlayer;
+            if (checkWin(row, col, false)) {
+                const index = row * COLS + col;
+                cells[index].classList.add('win-opportunity');
+            }
+            state.board[row][col] = 0; // Undo simulation
+        }
     }
     
     // Handle board click
@@ -137,9 +232,7 @@ const Game = (function() {
         
         // For online mode, check if it's player's turn
         if (state.mode === 'online' && state.currentPlayer !== state.myPlayerNumber) {
-            if (window.App && window.App.showToast) {
-                window.App.showToast("It's not your turn!", 'error');
-            }
+            showToast("It's not your turn!", 'error');
             return;
         }
         
@@ -168,12 +261,8 @@ const Game = (function() {
         
         // Check if column is full
         if (state.board[0][col] !== 0) {
-            if (window.App && window.App.showToast) {
-                window.App.showToast('Column is full!', 'error');
-            }
-            if (window.SoundManager) {
-                window.SoundManager.play('error');
-            }
+            showToast('Column is full!', 'error');
+            playSound('error');
             return;
         }
         
@@ -185,9 +274,7 @@ const Game = (function() {
         const moveConfirm = document.getElementById('moveConfirm');
         if (moveConfirm) moveConfirm.classList.add('active');
         
-        if (window.SoundManager) {
-            window.SoundManager.play('select');
-        }
+        playSound('select');
     }
     
     // Confirm move
@@ -199,9 +286,9 @@ const Game = (function() {
         
         if (row === -1) return;
         
-        // Make the move and track for animation
+        // Make the move
         state.board[row][col] = state.currentPlayer;
-        state.lastPlacedCell = { row, col }; // Track for animation
+        state.lastDroppedCell = { row, col }; // Track for animation
         state.moveHistory.push({ row, col, player: state.currentPlayer });
         state.moveCount++;
         
@@ -210,16 +297,13 @@ const Game = (function() {
         if (moveConfirm) moveConfirm.classList.remove('active');
         state.pendingMove = null;
         
-        // Play sound and render
-        if (window.SoundManager) {
-            window.SoundManager.play('drop');
-        }
-        renderBoard();
+        // Play sound and render with animation
+        playSound('drop');
+        renderBoard(true);
         
         // Check for win
-        if (checkWin(row, col)) {
+        if (checkWin(row, col, true)) {
             if (state.mode === 'online') {
-                // Send final move to Firebase before ending
                 sendMoveToFirebase(row, col, true);
             }
             endGame(state.currentPlayer);
@@ -245,10 +329,7 @@ const Game = (function() {
         state.pendingMove = null;
         const moveConfirm = document.getElementById('moveConfirm');
         if (moveConfirm) moveConfirm.classList.remove('active');
-        
-        if (window.SoundManager) {
-            window.SoundManager.play('cancel');
-        }
+        playSound('cancel');
     }
     
     // Get lowest empty row in column
@@ -262,16 +343,22 @@ const Game = (function() {
     }
     
     // Check for win
-    function checkWin(row, col) {
+    function checkWin(row, col, highlight = true) {
         const player = state.board[row][col];
         
         // Check all four directions
-        if (checkDirection(row, col, 0, 1, player)) return true;  // Horizontal
-        if (checkDirection(row, col, 1, 0, player)) return true;  // Vertical
-        if (checkDirection(row, col, 1, 1, player)) return true;  // Diagonal \
-        if (checkDirection(row, col, 1, -1, player)) return true; // Diagonal /
+        const horizontal = checkDirection(row, col, 0, 1, player);
+        const vertical = checkDirection(row, col, 1, 0, player);
+        const diagonal1 = checkDirection(row, col, 1, 1, player);
+        const diagonal2 = checkDirection(row, col, 1, -1, player);
         
-        return false;
+        const winningCells = horizontal || vertical || diagonal1 || diagonal2;
+        
+        if (winningCells && highlight) {
+            highlightWinningCells(winningCells);
+        }
+        
+        return winningCells !== null;
     }
     
     // Check direction for win
@@ -301,11 +388,7 @@ const Game = (function() {
             } else break;
         }
         
-        if (count >= WIN_LENGTH) {
-            highlightWinningCells(cells);
-            return true;
-        }
-        return false;
+        return count >= WIN_LENGTH ? cells : null;
     }
     
     // Highlight winning cells
@@ -388,10 +471,7 @@ const Game = (function() {
     function endGame(winner) {
         state.gameActive = false;
         clearInterval(timerInterval);
-        
-        if (window.SoundManager) {
-            window.SoundManager.play('win');
-        }
+        playSound('win');
         
         const winOverlay = document.getElementById('winOverlay');
         const winTitle = document.getElementById('winTitle');
@@ -429,40 +509,37 @@ const Game = (function() {
         
         if (winOverlay) winOverlay.classList.add('active');
         
-        // Trigger confetti animation
+        // Trigger confetti
         if (window.ParticleSystem && window.ParticleSystem.celebrate) {
             window.ParticleSystem.celebrate();
         }
     }
     
-    // Start game function
+    // Start game
     function startGame() {
         state.gameActive = true;
         state.currentPlayer = 1;
         state.moveCount = 0;
+        state.lastDroppedCell = null;
         initializeBoard();
         startTimer();
         
-        // Update UI with player names
+        // Ensure names are displayed
         const p1Name = document.getElementById('p1Name');
         const p2Name = document.getElementById('p2Name');
-        if (p1Name) p1Name.textContent = state.player1.name || 'Player 1';
-        if (p2Name) p2Name.textContent = state.player2.name || 'Player 2';
+        if (p1Name && state.player1.name) p1Name.textContent = state.player1.name;
+        if (p2Name && state.player2.name) p2Name.textContent = state.player2.name;
     }
     
-    // Undo last move (offline only)
+    // Undo last move
     function undoMove() {
         if (state.mode === 'online') {
-            if (window.App && window.App.showToast) {
-                window.App.showToast("Can't undo in online mode", 'error');
-            }
+            showToast("Can't undo in online mode", 'error');
             return;
         }
         
         if (state.moveHistory.length === 0) {
-            if (window.App && window.App.showToast) {
-                window.App.showToast('No moves to undo', 'error');
-            }
+            showToast('No moves to undo', 'error');
             return;
         }
         
@@ -470,15 +547,10 @@ const Game = (function() {
         state.board[lastMove.row][lastMove.col] = 0;
         state.currentPlayer = lastMove.player;
         state.moveCount--;
-        state.lastPlacedCell = null; // Clear animation tracking
-        renderBoard();
-        
-        if (window.SoundManager) {
-            window.SoundManager.play('undo');
-        }
-        if (window.App && window.App.showToast) {
-            window.App.showToast('Move undone', 'success');
-        }
+        state.lastDroppedCell = null;
+        renderBoard(false);
+        playSound('undo');
+        showToast('Move undone', 'success');
     }
     
     // Show hint
@@ -498,16 +570,12 @@ const Game = (function() {
                 }, 2000);
             }
             
-            if (window.SoundManager) {
-                window.SoundManager.play('hint');
-            }
-            if (window.App && window.App.showToast) {
-                window.App.showToast(`Try column ${bestCol + 1}`, 'success');
-            }
+            playSound('hint');
+            showToast(`Try column ${bestCol + 1}`, 'success');
         }
     }
     
-    // Find best move (simple AI)
+    // Find best move
     function findBestMove() {
         // Check if current player can win
         for (let col = 0; col < COLS; col++) {
@@ -515,7 +583,7 @@ const Game = (function() {
             if (row === -1) continue;
             
             state.board[row][col] = state.currentPlayer;
-            if (checkWin(row, col)) {
+            if (checkWin(row, col, false)) {
                 state.board[row][col] = 0;
                 return col;
             }
@@ -529,7 +597,7 @@ const Game = (function() {
             if (row === -1) continue;
             
             state.board[row][col] = opponent;
-            if (checkWin(row, col)) {
+            if (checkWin(row, col, false)) {
                 state.board[row][col] = 0;
                 return col;
             }
@@ -547,7 +615,7 @@ const Game = (function() {
         return -1;
     }
     
-    // Start game timer
+    // Start timer
     function startTimer() {
         state.startTime = Date.now();
         
@@ -569,9 +637,9 @@ const Game = (function() {
         }, 1000);
     }
     
-    // Create online room - FIXED
+    // Create online room
     async function createOnlineRoom(playerName) {
-        if (!window.firebase || !window.firebase.apps.length) {
+        if (!window.firebase || !window.firebase.apps || !window.firebase.apps.length) {
             throw new Error('Firebase not initialized');
         }
         
@@ -581,7 +649,7 @@ const Game = (function() {
         state.myPlayerNumber = 1;
         state.player1.name = playerName;
         
-        // Clean up any existing listener
+        // Clean up existing listener
         if (state.roomListener && state.roomRef) {
             state.roomRef.off('value', state.roomListener);
         }
@@ -601,20 +669,19 @@ const Game = (function() {
         });
         
         // Listen for changes
-        state.roomListener = state.roomRef.on('value', (snapshot) => {
-            handleRoomUpdate(snapshot);
-        });
+        state.roomListener = handleRoomUpdate;
+        state.roomRef.on('value', state.roomListener);
         
-        // Update UI to show player name
+        // Update UI
         const p1Name = document.getElementById('p1Name');
         if (p1Name) p1Name.textContent = playerName;
         
         return state.roomCode;
     }
     
-    // Join online room - FIXED
+    // Join online room
     async function joinOnlineRoom(roomCode, playerName) {
-        if (!window.firebase || !window.firebase.apps.length) {
+        if (!window.firebase || !window.firebase.apps || !window.firebase.apps.length) {
             throw new Error('Firebase not initialized');
         }
         
@@ -624,62 +691,54 @@ const Game = (function() {
         state.myPlayerNumber = 2;
         state.player2.name = playerName;
         
-        // Clean up any existing listener
+        // Clean up existing listener
         if (state.roomListener && state.roomRef) {
             state.roomRef.off('value', state.roomListener);
         }
         
         state.roomRef = state.db.ref(`rooms/${roomCode}`);
         
-        try {
-            const snapshot = await state.roomRef.once('value');
-            const data = snapshot.val();
-            
-            if (!data) {
-                throw new Error('Room not found');
-            }
-            
-            if (data.player2) {
-                throw new Error('Room is full');
-            }
-            
-            state.player1.name = data.player1;
-            
-            // Update room with player 2
-            await state.roomRef.update({
-                player2: playerName,
-                gameActive: true,
-                gameStarted: true
-            });
-            
-            // Listen for changes
-            state.roomListener = state.roomRef.on('value', (snapshot) => {
-                handleRoomUpdate(snapshot);
-            });
-            
-            // Update UI immediately
-            const p1Name = document.getElementById('p1Name');
-            const p2Name = document.getElementById('p2Name');
-            if (p1Name) p1Name.textContent = state.player1.name;
-            if (p2Name) p2Name.textContent = state.player2.name;
-            
-            // Hide setup modal and show game area
-            const setupModal = document.getElementById('setupModal');
-            const gameArea = document.getElementById('gameArea');
-            if (setupModal) setupModal.classList.remove('active');
-            if (gameArea) gameArea.classList.add('active');
-            
-            // Start the game
-            startGame();
-            
-            return true;
-        } catch (error) {
-            console.error('Error joining room:', error);
-            throw error;
+        const snapshot = await state.roomRef.once('value');
+        const data = snapshot.val();
+        
+        if (!data) {
+            throw new Error('Room not found');
         }
+        
+        if (data.player2) {
+            throw new Error('Room is full');
+        }
+        
+        state.player1.name = data.player1;
+        
+        // Update room
+        await state.roomRef.update({
+            player2: playerName,
+            gameActive: true,
+            gameStarted: true
+        });
+        
+        // Listen for changes
+        state.roomListener = handleRoomUpdate;
+        state.roomRef.on('value', state.roomListener);
+        
+        // Update UI and start game
+        const p1Name = document.getElementById('p1Name');
+        const p2Name = document.getElementById('p2Name');
+        if (p1Name) p1Name.textContent = state.player1.name;
+        if (p2Name) p2Name.textContent = state.player2.name;
+        
+        const setupModal = document.getElementById('setupModal');
+        const gameArea = document.getElementById('gameArea');
+        if (setupModal) setupModal.classList.remove('active');
+        if (gameArea) gameArea.classList.add('active');
+        
+        startGame();
+        
+        return true;
     }
     
-    // Handle room updates from Firebase - FIXED
+    // Handle room updates
     function handleRoomUpdate(snapshot) {
         const data = snapshot.val();
         if (!data) return;
@@ -690,7 +749,6 @@ const Game = (function() {
             const p2Name = document.getElementById('p2Name');
             if (p2Name) p2Name.textContent = data.player2;
             
-            // Start game for host
             const setupModal = document.getElementById('setupModal');
             const gameArea = document.getElementById('gameArea');
             
@@ -698,10 +756,7 @@ const Game = (function() {
             if (gameArea) gameArea.classList.add('active');
             
             startGame();
-            
-            if (window.App && window.App.showToast) {
-                window.App.showToast(`${data.player2} joined the game!`, 'success');
-            }
+            showToast(`${data.player2} joined the game!`, 'success');
         }
         
         // Update game state
@@ -713,15 +768,12 @@ const Game = (function() {
         if (data.lastMove && data.lastMove.player !== state.myPlayerNumber) {
             const move = data.lastMove;
             state.board[move.row][move.col] = move.player;
-            state.lastPlacedCell = { row: move.row, col: move.col }; // Track for animation
+            state.lastDroppedCell = { row: move.row, col: move.col };
             state.currentPlayer = data.currentPlayer;
             state.moveCount++;
             
-            renderBoard();
-            
-            if (window.SoundManager && window.SoundManager.play) {
-                window.SoundManager.play('drop');
-            }
+            renderBoard(true);
+            playSound('drop');
             
             if (move.isWin) {
                 endGame(move.player);
@@ -737,21 +789,17 @@ const Game = (function() {
     async function sendMoveToFirebase(row, col, isWin = false, isDraw = false) {
         if (!state.roomRef) return;
         
-        try {
-            await state.roomRef.update({
-                board: state.board,
-                currentPlayer: state.currentPlayer,
-                lastMove: {
-                    row: row,
-                    col: col,
-                    player: state.myPlayerNumber,
-                    isWin: isWin,
-                    isDraw: isDraw
-                }
-            });
-        } catch (error) {
-            console.error('Error sending move:', error);
-        }
+        await state.roomRef.update({
+            board: state.board,
+            currentPlayer: state.currentPlayer,
+            lastMove: {
+                row: row,
+                col: col,
+                player: state.myPlayerNumber,
+                isWin: isWin,
+                isDraw: isDraw
+            }
+        });
     }
     
     // Generate room code
@@ -766,7 +814,7 @@ const Game = (function() {
     
     // Reset game
     function resetGame() {
-        state.lastPlacedCell = null;
+        state.lastDroppedCell = null;
         initializeBoard();
         state.moveHistory = [];
         state.moveCount = 0;
@@ -774,8 +822,21 @@ const Game = (function() {
         clearInterval(timerInterval);
     }
     
+    // Helper functions
+    function showToast(message, type = 'info') {
+        if (window.App && window.App.showToast) {
+            window.App.showToast(message, type);
+        }
+    }
+    
+    function playSound(sound) {
+        if (window.SoundManager && window.SoundManager.play) {
+            window.SoundManager.play(sound);
+        }
+    }
+    
     // Public API
-    return {
+    window.Game = {
         init: init,
         setMode: function(mode) { state.mode = mode; },
         getMode: function() { return state.mode; },
@@ -795,7 +856,7 @@ const Game = (function() {
         getState: function() { return Object.assign({}, state); },
         loadState: function(savedState) {
             state = Object.assign({}, savedState);
-            renderBoard();
+            renderBoard(false);
             updatePlayerIndicator();
             const p1Name = document.getElementById('p1Name');
             const p2Name = document.getElementById('p2Name');
@@ -812,7 +873,5 @@ const Game = (function() {
         createOnlineRoom: createOnlineRoom,
         joinOnlineRoom: joinOnlineRoom
     };
-})();
-
-// Export to global scope
-window.Game = Game;
+    
+})(window);
