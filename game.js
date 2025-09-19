@@ -1,4 +1,4 @@
-// game.js - Core Game Logic (FIXED)
+// game.js - Core Game Logic (FULLY FIXED)
 
 const Game = (function() {
     // Game constants
@@ -46,6 +46,8 @@ const Game = (function() {
     // Setup column indicators
     function setupColumnIndicators() {
         const container = document.getElementById('columnIndicators');
+        if (!container) return;
+        
         container.innerHTML = '';
         
         for (let col = 1; col <= COLS; col++) {
@@ -59,6 +61,7 @@ const Game = (function() {
     // Setup board event listeners
     function setupBoardEventListeners() {
         const board = document.getElementById('gameBoard');
+        if (!board) return;
         
         board.addEventListener('click', handleBoardClick);
         board.addEventListener('mouseover', handleBoardHover);
@@ -78,9 +81,10 @@ const Game = (function() {
         }
     }
     
-    // Render board (FIXED: Prevent re-animation of existing discs)
+    // Render board (Optimized for mobile)
     function renderBoard() {
         const boardEl = document.getElementById('gameBoard');
+        if (!boardEl) return;
         
         // Instead of innerHTML, update cells individually
         const cells = boardEl.querySelectorAll('.cell');
@@ -300,7 +304,10 @@ const Game = (function() {
     function highlightWinningCells(cells) {
         cells.forEach(([row, col]) => {
             const index = row * COLS + col;
-            document.querySelectorAll('.cell')[index].classList.add('winning');
+            const cellElements = document.querySelectorAll('.cell');
+            if (cellElements[index]) {
+                cellElements[index].classList.add('winning');
+            }
         });
     }
     
@@ -318,8 +325,10 @@ const Game = (function() {
         if (row === -1) return;
         
         const index = row * COLS + col;
-        const cell = document.querySelectorAll('.cell')[index];
-        cell.classList.add('preview');
+        const cells = document.querySelectorAll('.cell');
+        if (cells[index]) {
+            cells[index].classList.add('preview');
+        }
     }
     
     // Hide preview
@@ -336,28 +345,32 @@ const Game = (function() {
         const p1Indicator = document.getElementById('p1Indicator');
         const p2Indicator = document.getElementById('p2Indicator');
         
+        if (!p1Card || !p2Card) return;
+        
         if (state.currentPlayer === 1) {
             p1Card.classList.add('active');
             p2Card.classList.remove('active');
-            p1Indicator.style.display = 'block';
-            p2Indicator.style.display = 'none';
+            if (p1Indicator) p1Indicator.style.display = 'block';
+            if (p2Indicator) p2Indicator.style.display = 'none';
         } else {
             p2Card.classList.add('active');
             p1Card.classList.remove('active');
-            p2Indicator.style.display = 'block';
-            p1Indicator.style.display = 'none';
+            if (p2Indicator) p2Indicator.style.display = 'block';
+            if (p1Indicator) p1Indicator.style.display = 'none';
         }
         
         // Update status text
         const statusText = document.getElementById('statusText');
-        const currentPlayerName = state.currentPlayer === 1 ? state.player1.name : state.player2.name;
-        
-        if (state.mode === 'online' && state.currentPlayer === state.myPlayerNumber) {
-            statusText.textContent = 'Your Turn';
-        } else if (state.mode === 'online') {
-            statusText.textContent = `${currentPlayerName}'s Turn`;
-        } else {
-            statusText.textContent = `${currentPlayerName}'s Turn`;
+        if (statusText) {
+            const currentPlayerName = state.currentPlayer === 1 ? state.player1.name : state.player2.name;
+            
+            if (state.mode === 'online' && state.currentPlayer === state.myPlayerNumber) {
+                statusText.textContent = 'Your Turn';
+            } else if (state.mode === 'online') {
+                statusText.textContent = `${currentPlayerName}'s Turn`;
+            } else {
+                statusText.textContent = `${currentPlayerName}'s Turn`;
+            }
         }
     }
     
@@ -378,31 +391,44 @@ const Game = (function() {
         const minutes = Math.floor(gameTime / 60);
         const seconds = gameTime % 60;
         
-        winMoves.textContent = state.moveCount;
-        winTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        if (winMoves) winMoves.textContent = state.moveCount;
+        if (winTime) winTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
         
         if (winner === 0) {
-            winTitle.textContent = "🤝 It's a Draw! 🤝";
-            winPlayer.textContent = "No winner this time!";
+            if (winTitle) winTitle.textContent = "🤝 It's a Draw! 🤝";
+            if (winPlayer) winPlayer.textContent = "No winner this time!";
         } else {
             const playerName = winner === 1 ? state.player1.name : state.player2.name;
-            winTitle.textContent = "🎉 Victory! 🎉";
-            winPlayer.textContent = `${playerName} Wins!`;
+            if (winTitle) winTitle.textContent = "🎉 Victory! 🎉";
+            if (winPlayer) winPlayer.textContent = `${playerName} Wins!`;
             
             // Update score
             if (winner === 1) {
                 state.player1.score++;
-                document.getElementById('p1Score').textContent = state.player1.score;
+                const p1Score = document.getElementById('p1Score');
+                if (p1Score) p1Score.textContent = state.player1.score;
             } else {
                 state.player2.score++;
-                document.getElementById('p2Score').textContent = state.player2.score;
+                const p2Score = document.getElementById('p2Score');
+                if (p2Score) p2Score.textContent = state.player2.score;
             }
         }
         
-        winOverlay.classList.add('active');
+        if (winOverlay) winOverlay.classList.add('active');
         
         // Trigger confetti animation
-        ParticleSystem.celebrate();
+        if (window.ParticleSystem && window.ParticleSystem.celebrate) {
+            ParticleSystem.celebrate();
+        }
+    }
+    
+    // Start game function (FIXED - properly exposed)
+    function startGame() {
+        state.gameActive = true;
+        state.currentPlayer = 1;
+        state.moveCount = 0;
+        initializeBoard();
+        startTimer();
     }
     
     // Undo last move (offline only)
@@ -436,13 +462,13 @@ const Game = (function() {
         if (bestCol !== -1) {
             const row = getLowestEmptyRow(bestCol);
             const index = row * COLS + bestCol;
-            const cell = document.querySelectorAll('.cell')[index];
-            
-            // Highlight hint
-            cell.classList.add('hint');
-            setTimeout(() => {
-                cell.classList.remove('hint');
-            }, 2000);
+            const cells = document.querySelectorAll('.cell');
+            if (cells[index]) {
+                cells[index].classList.add('hint');
+                setTimeout(() => {
+                    cells[index].classList.remove('hint');
+                }, 2000);
+            }
             
             SoundManager.play('hint');
             App.showToast(`Try column ${bestCol + 1}`, 'success');
@@ -493,17 +519,25 @@ const Game = (function() {
     function startTimer() {
         state.startTime = Date.now();
         
+        clearInterval(timerInterval);
         timerInterval = setInterval(() => {
+            if (!state.gameActive) {
+                clearInterval(timerInterval);
+                return;
+            }
+            
             const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
             const minutes = Math.floor(elapsed / 60);
             const seconds = elapsed % 60;
             
-            document.getElementById('timerValue').textContent = 
-                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            const timerValue = document.getElementById('timerValue');
+            if (timerValue) {
+                timerValue.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
         }, 1000);
     }
     
-    // Create online room (FIXED)
+    // Create online room
     async function createOnlineRoom(playerName) {
         if (!firebase.apps.length) {
             throw new Error('Firebase not initialized');
@@ -542,7 +576,7 @@ const Game = (function() {
         return state.roomCode;
     }
     
-    // Join online room (FIXED)
+    // Join online room
     async function joinOnlineRoom(roomCode, playerName) {
         if (!firebase.apps.length) {
             throw new Error('Firebase not initialized');
@@ -591,12 +625,12 @@ const Game = (function() {
         document.getElementById('p2Name').textContent = state.player2.name;
         
         // Start game for player 2
-        start();
+        startGame();
         
         return true;
     }
     
-    // Handle room updates from Firebase (FIXED)
+    // Handle room updates from Firebase
     function handleRoomUpdate(snapshot) {
         const data = snapshot.val();
         if (!data) return;
@@ -605,27 +639,38 @@ const Game = (function() {
         if (data.player2) {
             if (!state.player2.name || state.player2.name !== data.player2) {
                 state.player2.name = data.player2;
-                document.getElementById('p2Name').textContent = data.player2;
+                const p2Name = document.getElementById('p2Name');
+                if (p2Name) p2Name.textContent = data.player2;
                 
                 if (state.isHost) {
                     // Both players joined, start game for host
-                    document.getElementById('setupModal').classList.remove('active');
-                    document.getElementById('gameArea').classList.add('active');
+                    const setupModal = document.getElementById('setupModal');
+                    const gameArea = document.getElementById('gameArea');
+                    
+                    if (setupModal) setupModal.classList.remove('active');
+                    if (gameArea) gameArea.classList.add('active');
                     
                     // Update Firebase to notify player 2
                     state.roomRef.update({ gameStarted: true });
                     
-                    start();
-                    App.showToast(`${data.player2} joined the game!`, 'success');
+                    startGame();
+                    
+                    if (window.App && window.App.showToast) {
+                        App.showToast(`${data.player2} joined the game!`, 'success');
+                    }
                 }
             }
         }
         
         // Start game for player 2 if not started yet
         if (!state.isHost && data.gameStarted && !state.gameActive) {
-            document.getElementById('setupModal').classList.remove('active');
-            document.getElementById('gameArea').classList.add('active');
-            start();
+            const setupModal = document.getElementById('setupModal');
+            const gameArea = document.getElementById('gameArea');
+            
+            if (setupModal) setupModal.classList.remove('active');
+            if (gameArea) gameArea.classList.add('active');
+            
+            startGame();
         }
         
         // Update game state
@@ -641,7 +686,10 @@ const Game = (function() {
             state.moveCount++;
             
             renderBoard();
-            SoundManager.play('drop');
+            
+            if (window.SoundManager && window.SoundManager.play) {
+                SoundManager.play('drop');
+            }
             
             if (move.isWin) {
                 endGame(move.player);
@@ -653,7 +701,7 @@ const Game = (function() {
         }
     }
     
-    // Send move to Firebase (FIXED)
+    // Send move to Firebase
     async function sendMoveToFirebase(row, col, isWin = false, isDraw = false) {
         if (!state.roomRef) return;
         
@@ -680,34 +728,31 @@ const Game = (function() {
         return code;
     }
     
-    // Public API
+    // Reset game
+    function resetGame() {
+        initializeBoard();
+        state.moveHistory = [];
+        state.moveCount = 0;
+        state.currentPlayer = 1;
+        clearInterval(timerInterval);
+    }
+    
+    // Public API - FIXED with proper function exposure
     return {
-        init,
+        init: init,
         setMode: (mode) => { state.mode = mode; },
         getMode: () => state.mode,
         setPlayers: (p1, p2) => {
             state.player1.name = p1;
             state.player2.name = p2;
         },
-        start: () => {
-            state.gameActive = true;
-            state.currentPlayer = 1;
-            state.moveCount = 0;
-            initializeBoard();
-            startTimer();
-        },
-        reset: () => {
-            initializeBoard();
-            state.moveHistory = [];
-            state.moveCount = 0;
-            state.currentPlayer = 1;
-            clearInterval(timerInterval);
-        },
-        selectColumn,
-        confirmMove,
-        cancelMove,
-        undoMove,
-        showHint,
+        start: startGame,  // Properly exposed
+        reset: resetGame,  // Properly exposed
+        selectColumn: selectColumn,
+        confirmMove: confirmMove,
+        cancelMove: cancelMove,
+        undoMove: undoMove,
+        showHint: showHint,
         isActive: () => state.gameActive,
         hasPendingMove: () => state.pendingMove !== null,
         getState: () => ({...state}),
@@ -715,14 +760,20 @@ const Game = (function() {
             state = {...savedState};
             renderBoard();
             updatePlayerIndicator();
-            document.getElementById('p1Name').textContent = state.player1.name;
-            document.getElementById('p2Name').textContent = state.player2.name;
-            document.getElementById('p1Score').textContent = state.player1.score;
-            document.getElementById('p2Score').textContent = state.player2.score;
+            const p1Name = document.getElementById('p1Name');
+            const p2Name = document.getElementById('p2Name');
+            const p1Score = document.getElementById('p1Score');
+            const p2Score = document.getElementById('p2Score');
+            
+            if (p1Name) p1Name.textContent = state.player1.name;
+            if (p2Name) p2Name.textContent = state.player2.name;
+            if (p1Score) p1Score.textContent = state.player1.score;
+            if (p2Score) p2Score.textContent = state.player2.score;
+            
             startTimer();
         },
-        createOnlineRoom,
-        joinOnlineRoom
+        createOnlineRoom: createOnlineRoom,
+        joinOnlineRoom: joinOnlineRoom
     };
 })();
 
