@@ -1,4 +1,4 @@
-// game.js - Core Game Logic (FULLY FIXED)
+// game.js - Core Game Logic (COMPLETELY FIXED)
 
 const Game = (function() {
     // Game constants
@@ -18,6 +18,7 @@ const Game = (function() {
         pendingMove: null,
         startTime: null,
         moveCount: 0,
+        lastPlacedCell: null, // Track last placed disc for animation
         // Online specific
         roomCode: null,
         isHost: false,
@@ -40,6 +41,7 @@ const Game = (function() {
     // Initialize empty board
     function initializeBoard() {
         state.board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+        state.lastPlacedCell = null;
         renderBoard();
     }
     
@@ -81,57 +83,43 @@ const Game = (function() {
         }
     }
     
-    // Render board (Optimized for mobile)
+    // Render board - FIXED to only animate new disc
     function renderBoard() {
         const boardEl = document.getElementById('gameBoard');
         if (!boardEl) return;
         
-        // Instead of innerHTML, update cells individually
-        const cells = boardEl.querySelectorAll('.cell');
+        // Clear and rebuild board
+        boardEl.innerHTML = '';
         
-        // If board is empty or cells don't exist, create them
-        if (cells.length === 0) {
-            boardEl.innerHTML = '';
-            for (let row = 0; row < ROWS; row++) {
-                for (let col = 0; col < COLS; col++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'cell';
-                    cell.dataset.row = row;
-                    cell.dataset.col = col;
-                    boardEl.appendChild(cell);
-                }
-            }
-        }
-        
-        // Update cells without re-creating
         for (let row = 0; row < ROWS; row++) {
             for (let col = 0; col < COLS; col++) {
-                const index = row * COLS + col;
-                const cell = boardEl.children[index];
-                const value = state.board[row][col];
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.row = row;
+                cell.dataset.col = col;
                 
-                // Only update if changed
-                const hasDisc = cell.querySelector('.watermelon-disc');
-                
-                if (value === 0 && hasDisc) {
-                    // Remove disc
-                    cell.classList.remove('filled');
-                    cell.innerHTML = '';
-                } else if (value !== 0 && !hasDisc) {
-                    // Add new disc (only animate new ones)
+                if (state.board[row][col] !== 0) {
                     cell.classList.add('filled');
                     const disc = document.createElement('div');
-                    disc.className = `watermelon-disc watermelon-player${value} new-disc`;
-                    cell.appendChild(disc);
                     
-                    // Remove new-disc class after animation
-                    setTimeout(() => {
-                        disc.classList.remove('new-disc');
-                    }, 500);
-                } else if (value !== 0 && hasDisc) {
-                    // Disc already exists, ensure correct player class
-                    hasDisc.className = `watermelon-disc watermelon-player${value}`;
+                    // Only animate the last placed disc
+                    if (state.lastPlacedCell && 
+                        state.lastPlacedCell.row === row && 
+                        state.lastPlacedCell.col === col) {
+                        disc.className = `watermelon-disc watermelon-player${state.board[row][col]} animate-drop`;
+                        // Remove animation class after animation completes
+                        setTimeout(() => {
+                            disc.classList.remove('animate-drop');
+                        }, 500);
+                        state.lastPlacedCell = null; // Reset after animating
+                    } else {
+                        disc.className = `watermelon-disc watermelon-player${state.board[row][col]}`;
+                    }
+                    
+                    cell.appendChild(disc);
                 }
+                
+                boardEl.appendChild(cell);
             }
         }
         
@@ -149,7 +137,9 @@ const Game = (function() {
         
         // For online mode, check if it's player's turn
         if (state.mode === 'online' && state.currentPlayer !== state.myPlayerNumber) {
-            App.showToast("It's not your turn!", 'error');
+            if (window.App && window.App.showToast) {
+                window.App.showToast("It's not your turn!", 'error');
+            }
             return;
         }
         
@@ -178,16 +168,26 @@ const Game = (function() {
         
         // Check if column is full
         if (state.board[0][col] !== 0) {
-            App.showToast('Column is full!', 'error');
-            SoundManager.play('error');
+            if (window.App && window.App.showToast) {
+                window.App.showToast('Column is full!', 'error');
+            }
+            if (window.SoundManager) {
+                window.SoundManager.play('error');
+            }
             return;
         }
         
         // Show confirmation
         state.pendingMove = col;
-        document.getElementById('colNumber').textContent = col + 1;
-        document.getElementById('moveConfirm').classList.add('active');
-        SoundManager.play('select');
+        const colNumber = document.getElementById('colNumber');
+        if (colNumber) colNumber.textContent = col + 1;
+        
+        const moveConfirm = document.getElementById('moveConfirm');
+        if (moveConfirm) moveConfirm.classList.add('active');
+        
+        if (window.SoundManager) {
+            window.SoundManager.play('select');
+        }
     }
     
     // Confirm move
@@ -199,17 +199,21 @@ const Game = (function() {
         
         if (row === -1) return;
         
-        // Make the move
+        // Make the move and track for animation
         state.board[row][col] = state.currentPlayer;
+        state.lastPlacedCell = { row, col }; // Track for animation
         state.moveHistory.push({ row, col, player: state.currentPlayer });
         state.moveCount++;
         
         // Hide confirmation
-        document.getElementById('moveConfirm').classList.remove('active');
+        const moveConfirm = document.getElementById('moveConfirm');
+        if (moveConfirm) moveConfirm.classList.remove('active');
         state.pendingMove = null;
         
         // Play sound and render
-        SoundManager.play('drop');
+        if (window.SoundManager) {
+            window.SoundManager.play('drop');
+        }
         renderBoard();
         
         // Check for win
@@ -239,8 +243,12 @@ const Game = (function() {
     // Cancel move
     function cancelMove() {
         state.pendingMove = null;
-        document.getElementById('moveConfirm').classList.remove('active');
-        SoundManager.play('cancel');
+        const moveConfirm = document.getElementById('moveConfirm');
+        if (moveConfirm) moveConfirm.classList.remove('active');
+        
+        if (window.SoundManager) {
+            window.SoundManager.play('cancel');
+        }
     }
     
     // Get lowest empty row in column
@@ -302,13 +310,15 @@ const Game = (function() {
     
     // Highlight winning cells
     function highlightWinningCells(cells) {
-        cells.forEach(([row, col]) => {
-            const index = row * COLS + col;
-            const cellElements = document.querySelectorAll('.cell');
-            if (cellElements[index]) {
-                cellElements[index].classList.add('winning');
-            }
-        });
+        setTimeout(() => {
+            cells.forEach(([row, col]) => {
+                const index = row * COLS + col;
+                const cellElements = document.querySelectorAll('.cell');
+                if (cellElements[index]) {
+                    cellElements[index].classList.add('winning');
+                }
+            });
+        }, 100);
     }
     
     // Check for draw
@@ -378,7 +388,10 @@ const Game = (function() {
     function endGame(winner) {
         state.gameActive = false;
         clearInterval(timerInterval);
-        SoundManager.play('win');
+        
+        if (window.SoundManager) {
+            window.SoundManager.play('win');
+        }
         
         const winOverlay = document.getElementById('winOverlay');
         const winTitle = document.getElementById('winTitle');
@@ -418,28 +431,38 @@ const Game = (function() {
         
         // Trigger confetti animation
         if (window.ParticleSystem && window.ParticleSystem.celebrate) {
-            ParticleSystem.celebrate();
+            window.ParticleSystem.celebrate();
         }
     }
     
-    // Start game function (FIXED - properly exposed)
+    // Start game function
     function startGame() {
         state.gameActive = true;
         state.currentPlayer = 1;
         state.moveCount = 0;
         initializeBoard();
         startTimer();
+        
+        // Update UI with player names
+        const p1Name = document.getElementById('p1Name');
+        const p2Name = document.getElementById('p2Name');
+        if (p1Name) p1Name.textContent = state.player1.name || 'Player 1';
+        if (p2Name) p2Name.textContent = state.player2.name || 'Player 2';
     }
     
     // Undo last move (offline only)
     function undoMove() {
         if (state.mode === 'online') {
-            App.showToast("Can't undo in online mode", 'error');
+            if (window.App && window.App.showToast) {
+                window.App.showToast("Can't undo in online mode", 'error');
+            }
             return;
         }
         
         if (state.moveHistory.length === 0) {
-            App.showToast('No moves to undo', 'error');
+            if (window.App && window.App.showToast) {
+                window.App.showToast('No moves to undo', 'error');
+            }
             return;
         }
         
@@ -447,16 +470,21 @@ const Game = (function() {
         state.board[lastMove.row][lastMove.col] = 0;
         state.currentPlayer = lastMove.player;
         state.moveCount--;
+        state.lastPlacedCell = null; // Clear animation tracking
         renderBoard();
-        SoundManager.play('undo');
-        App.showToast('Move undone', 'success');
+        
+        if (window.SoundManager) {
+            window.SoundManager.play('undo');
+        }
+        if (window.App && window.App.showToast) {
+            window.App.showToast('Move undone', 'success');
+        }
     }
     
     // Show hint
     function showHint() {
         if (!state.gameActive) return;
         
-        // Find best move (simple AI)
         const bestCol = findBestMove();
         
         if (bestCol !== -1) {
@@ -470,8 +498,12 @@ const Game = (function() {
                 }, 2000);
             }
             
-            SoundManager.play('hint');
-            App.showToast(`Try column ${bestCol + 1}`, 'success');
+            if (window.SoundManager) {
+                window.SoundManager.play('hint');
+            }
+            if (window.App && window.App.showToast) {
+                window.App.showToast(`Try column ${bestCol + 1}`, 'success');
+            }
         }
     }
     
@@ -537,13 +569,13 @@ const Game = (function() {
         }, 1000);
     }
     
-    // Create online room
+    // Create online room - FIXED
     async function createOnlineRoom(playerName) {
-        if (!firebase.apps.length) {
+        if (!window.firebase || !window.firebase.apps.length) {
             throw new Error('Firebase not initialized');
         }
         
-        state.db = firebase.database();
+        state.db = window.firebase.database();
         state.roomCode = generateRoomCode();
         state.isHost = true;
         state.myPlayerNumber = 1;
@@ -573,16 +605,20 @@ const Game = (function() {
             handleRoomUpdate(snapshot);
         });
         
+        // Update UI to show player name
+        const p1Name = document.getElementById('p1Name');
+        if (p1Name) p1Name.textContent = playerName;
+        
         return state.roomCode;
     }
     
-    // Join online room
+    // Join online room - FIXED
     async function joinOnlineRoom(roomCode, playerName) {
-        if (!firebase.apps.length) {
+        if (!window.firebase || !window.firebase.apps.length) {
             throw new Error('Firebase not initialized');
         }
         
-        state.db = firebase.database();
+        state.db = window.firebase.database();
         state.roomCode = roomCode;
         state.isHost = false;
         state.myPlayerNumber = 2;
@@ -595,75 +631,66 @@ const Game = (function() {
         
         state.roomRef = state.db.ref(`rooms/${roomCode}`);
         
-        const snapshot = await state.roomRef.once('value');
-        const data = snapshot.val();
-        
-        if (!data) {
-            throw new Error('Room not found');
+        try {
+            const snapshot = await state.roomRef.once('value');
+            const data = snapshot.val();
+            
+            if (!data) {
+                throw new Error('Room not found');
+            }
+            
+            if (data.player2) {
+                throw new Error('Room is full');
+            }
+            
+            state.player1.name = data.player1;
+            
+            // Update room with player 2
+            await state.roomRef.update({
+                player2: playerName,
+                gameActive: true,
+                gameStarted: true
+            });
+            
+            // Listen for changes
+            state.roomListener = state.roomRef.on('value', (snapshot) => {
+                handleRoomUpdate(snapshot);
+            });
+            
+            // Update UI immediately
+            const p1Name = document.getElementById('p1Name');
+            const p2Name = document.getElementById('p2Name');
+            if (p1Name) p1Name.textContent = state.player1.name;
+            if (p2Name) p2Name.textContent = state.player2.name;
+            
+            // Hide setup modal and show game area
+            const setupModal = document.getElementById('setupModal');
+            const gameArea = document.getElementById('gameArea');
+            if (setupModal) setupModal.classList.remove('active');
+            if (gameArea) gameArea.classList.add('active');
+            
+            // Start the game
+            startGame();
+            
+            return true;
+        } catch (error) {
+            console.error('Error joining room:', error);
+            throw error;
         }
-        
-        if (data.player2) {
-            throw new Error('Room is full');
-        }
-        
-        state.player1.name = data.player1;
-        
-        // Update room with player 2 and start game
-        await state.roomRef.update({
-            player2: playerName,
-            gameActive: true,
-            gameStarted: true
-        });
-        
-        // Listen for changes
-        state.roomListener = state.roomRef.on('value', (snapshot) => {
-            handleRoomUpdate(snapshot);
-        });
-        
-        // Update UI
-        document.getElementById('p1Name').textContent = state.player1.name;
-        document.getElementById('p2Name').textContent = state.player2.name;
-        
-        // Start game for player 2
-        startGame();
-        
-        return true;
     }
     
-    // Handle room updates from Firebase
+    // Handle room updates from Firebase - FIXED
     function handleRoomUpdate(snapshot) {
         const data = snapshot.val();
         if (!data) return;
         
-        // Update players
-        if (data.player2) {
-            if (!state.player2.name || state.player2.name !== data.player2) {
-                state.player2.name = data.player2;
-                const p2Name = document.getElementById('p2Name');
-                if (p2Name) p2Name.textContent = data.player2;
-                
-                if (state.isHost) {
-                    // Both players joined, start game for host
-                    const setupModal = document.getElementById('setupModal');
-                    const gameArea = document.getElementById('gameArea');
-                    
-                    if (setupModal) setupModal.classList.remove('active');
-                    if (gameArea) gameArea.classList.add('active');
-                    
-                    // Update Firebase to notify player 2
-                    state.roomRef.update({ gameStarted: true });
-                    
-                    startGame();
-                    
-                    if (window.App && window.App.showToast) {
-                        App.showToast(`${data.player2} joined the game!`, 'success');
-                    }
-                }
-            }
-        }
-        
-        // Start game for player 2 if not started yet
-        if (!state.isHost && data.gameStarted && !state.gameActive) {
+        // For host: when player 2 joins
+        if (state.isHost && data.player2 && !state.player2.name) {
+            state.player2.name = data.player2;
+            const p2Name = document.getElementById('p2Name');
+            if (p2Name) p2Name.textContent = data.player2;
+            
+            // Start game for host
             const setupModal = document.getElementById('setupModal');
             const gameArea = document.getElementById('gameArea');
             
@@ -671,6 +698,10 @@ const Game = (function() {
             if (gameArea) gameArea.classList.add('active');
             
             startGame();
+            
+            if (window.App && window.App.showToast) {
+                window.App.showToast(`${data.player2} joined the game!`, 'success');
+            }
         }
         
         // Update game state
@@ -682,13 +713,14 @@ const Game = (function() {
         if (data.lastMove && data.lastMove.player !== state.myPlayerNumber) {
             const move = data.lastMove;
             state.board[move.row][move.col] = move.player;
+            state.lastPlacedCell = { row: move.row, col: move.col }; // Track for animation
             state.currentPlayer = data.currentPlayer;
             state.moveCount++;
             
             renderBoard();
             
             if (window.SoundManager && window.SoundManager.play) {
-                SoundManager.play('drop');
+                window.SoundManager.play('drop');
             }
             
             if (move.isWin) {
@@ -705,17 +737,21 @@ const Game = (function() {
     async function sendMoveToFirebase(row, col, isWin = false, isDraw = false) {
         if (!state.roomRef) return;
         
-        await state.roomRef.update({
-            board: state.board,
-            currentPlayer: state.currentPlayer,
-            lastMove: {
-                row: row,
-                col: col,
-                player: state.myPlayerNumber,
-                isWin: isWin,
-                isDraw: isDraw
-            }
-        });
+        try {
+            await state.roomRef.update({
+                board: state.board,
+                currentPlayer: state.currentPlayer,
+                lastMove: {
+                    row: row,
+                    col: col,
+                    player: state.myPlayerNumber,
+                    isWin: isWin,
+                    isDraw: isDraw
+                }
+            });
+        } catch (error) {
+            console.error('Error sending move:', error);
+        }
     }
     
     // Generate room code
@@ -730,6 +766,7 @@ const Game = (function() {
     
     // Reset game
     function resetGame() {
+        state.lastPlacedCell = null;
         initializeBoard();
         state.moveHistory = [];
         state.moveCount = 0;
@@ -737,27 +774,27 @@ const Game = (function() {
         clearInterval(timerInterval);
     }
     
-    // Public API - FIXED with proper function exposure
+    // Public API
     return {
         init: init,
-        setMode: (mode) => { state.mode = mode; },
-        getMode: () => state.mode,
-        setPlayers: (p1, p2) => {
+        setMode: function(mode) { state.mode = mode; },
+        getMode: function() { return state.mode; },
+        setPlayers: function(p1, p2) {
             state.player1.name = p1;
             state.player2.name = p2;
         },
-        start: startGame,  // Properly exposed
-        reset: resetGame,  // Properly exposed
+        start: startGame,
+        reset: resetGame,
         selectColumn: selectColumn,
         confirmMove: confirmMove,
         cancelMove: cancelMove,
         undoMove: undoMove,
         showHint: showHint,
-        isActive: () => state.gameActive,
-        hasPendingMove: () => state.pendingMove !== null,
-        getState: () => ({...state}),
-        loadState: (savedState) => {
-            state = {...savedState};
+        isActive: function() { return state.gameActive; },
+        hasPendingMove: function() { return state.pendingMove !== null; },
+        getState: function() { return Object.assign({}, state); },
+        loadState: function(savedState) {
+            state = Object.assign({}, savedState);
             renderBoard();
             updatePlayerIndicator();
             const p1Name = document.getElementById('p1Name');
