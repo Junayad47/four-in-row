@@ -376,8 +376,13 @@ function initializeFirebase() {
     }
     
     try {
-        if (!firebase.apps.length) {
-            firebase.initializeApp(window.firebaseConfig);
+        if (!window.firebase) {
+            console.error('Firebase SDK not loaded');
+            return false;
+        }
+        
+        if (!window.firebase.apps || !window.firebase.apps.length) {
+            window.firebase.initializeApp(window.firebaseConfig);
         }
         return true;
     } catch (error) {
