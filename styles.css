@@ -291,7 +291,7 @@ body {
     background: rgba(0,0,0,0.8);
 }
 
-/* Buttons - PROPERLY CENTERED */
+/* Buttons - PROPERLY ALIGNED IN ROW */
 .button-container {
     display: flex;
     justify-content: center;
@@ -299,7 +299,7 @@ body {
     gap: 1rem;
     margin: 2rem auto 0;
     width: 100%;
-    flex-wrap: wrap;
+    flex-wrap: nowrap; /* Keep buttons in same row */
 }
 
 .btn {
@@ -323,6 +323,14 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    white-space: nowrap; /* Prevent text wrapping */
+}
+
+/* Ensure back button stays inline */
+#backFromSetup,
+#backFromOnlineSetup {
+    margin: 0; /* Remove auto margins */
+    display: inline-flex; /* Keep inline with other buttons */
 }
 
 /* Mode continue button - CENTERED */
