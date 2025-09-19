@@ -885,13 +885,15 @@ body {
     transform: scale(1.1);
 }
 
-/* Game Controls */
+/* Game Controls - FIXED POSITIONING */
 .game-controls {
     display: flex;
     justify-content: center;
+    align-items: center;
     gap: 0.5rem;
     margin-top: 2rem;
     flex-wrap: wrap;
+    padding-bottom: 2rem; /* Add padding to avoid overlap with confirm popup */
 }
 
 .control-btn {
@@ -905,6 +907,7 @@ body {
     font-family: 'Orbitron', monospace;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
 }
 
