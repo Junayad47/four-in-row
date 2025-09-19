@@ -221,19 +221,27 @@
         }
     }
     
-    // Handle board click
+    // Handle board click - FIXED
     function handleBoardClick(e) {
-        if (!state.gameActive) return;
+        if (!state.gameActive) {
+            console.log('Game not active');
+            return;
+        }
         
         const cell = e.target.closest('.cell');
         if (!cell) return;
         
         const col = parseInt(cell.dataset.col);
         
+        // Debug logging
+        console.log('Click - Current player:', state.currentPlayer, 'My number:', state.myPlayerNumber);
+        
         // For online mode, check if it's player's turn
-        if (state.mode === 'online' && state.currentPlayer !== state.myPlayerNumber) {
-            showToast("It's not your turn!", 'error');
-            return;
+        if (state.mode === 'online') {
+            if (state.currentPlayer !== state.myPlayerNumber) {
+                showToast("It's not your turn!", 'error');
+                return;
+            }
         }
         
         selectColumn(col);
@@ -681,7 +689,7 @@
         return state.roomCode;
     }
     
-    // Join online room
+    // Join online room - FIXED
     async function joinOnlineRoom(roomCode, playerName) {
         if (!window.firebase || !window.firebase.apps || !window.firebase.apps.length) {
             throw new Error('Firebase not initialized');
@@ -713,18 +721,23 @@
         
         state.player1.name = data.player1;
         
-        // Update room
+        // Update room with ALL required fields
         await state.roomRef.update({
+            host: data.host, // Keep the host
+            player1: data.player1, // Keep player1
             player2: playerName,
+            board: data.board || state.board, // Keep or initialize board
+            currentPlayer: data.currentPlayer || 1, // Keep or set current player
             gameActive: true,
-            gameStarted: true
+            gameStarted: true,
+            lastMove: data.lastMove || null // Keep or null
         });
         
-        // Listen for changes
+        // Listen for changes BEFORE starting game
         state.roomListener = handleRoomUpdate;
         state.roomRef.on('value', state.roomListener);
         
-        // Update UI and start game
+        // Update UI and start game for Player 2
         const p1Name = document.getElementById('p1Name');
         const p2Name = document.getElementById('p2Name');
         if (p1Name) p1Name.textContent = state.player1.name;
@@ -735,7 +748,21 @@
         if (setupModal) setupModal.classList.remove('active');
         if (gameArea) gameArea.classList.add('active');
         
-        startGame();
+        // Initialize board from Firebase data
+        if (data.board) {
+            state.board = data.board;
+        }
+        state.currentPlayer = data.currentPlayer || 1;
+        
+        // Start the game with correct state
+        state.gameActive = true;
+        state.moveCount = 0;
+        state.lastDroppedCell = null;
+        renderBoard(false);
+        startTimer();
+        updatePlayerIndicator();
+        
+        showToast('Joined game successfully!', 'success');
         
         return true;
     }
