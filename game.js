@@ -197,7 +197,8 @@
         
         // For online mode, check turn
         if (state.mode === 'online') {
-            if (state.currentPlayer !== state.myPlayerNumber) {
+            console.log('Click - Current player:', state.currentPlayer, 'My player number:', state.myPlayerNumber);
+            if (!state.myPlayerNumber || state.currentPlayer !== state.myPlayerNumber) {
                 showToast("It's not your turn!", 'error');
                 return;
             }
@@ -247,6 +248,15 @@
     // Confirm move
     function confirmMove() {
         if (state.pendingMove === null) return;
+        
+        // CRITICAL: Double-check turn validation for online mode
+        if (state.mode === 'online' && state.currentPlayer !== state.myPlayerNumber) {
+            showToast("It's not your turn!", 'error');
+            const moveConfirm = document.getElementById('moveConfirm');
+            if (moveConfirm) moveConfirm.classList.remove('active');
+            state.pendingMove = null;
+            return;
+        }
         
         const col = state.pendingMove;
         const row = getLowestEmptyRow(col);
@@ -656,9 +666,11 @@
         state.db = window.firebase.database();
         state.roomCode = roomCode;
         state.isHost = false;
-        state.myPlayerNumber = 2;
+        state.myPlayerNumber = 2; // Joiner is always player 2
         state.player2.name = playerName;
         state.processedMoves.clear();
+        
+        console.log('Joining as player 2, my number:', state.myPlayerNumber);
         
         // Clean up existing listener
         if (state.roomListener && state.roomRef) {
@@ -690,15 +702,18 @@
         await state.roomRef.update({
             player2: playerName,
             gameActive: true,
-            gameStarted: true
+            gameStarted: true,
+            currentPlayer: data.currentPlayer || 1 // Ensure current player is set
         });
         
-        // Initialize game state
+        // Initialize game state - CRITICAL: Set from Firebase data
         state.board = data.board || Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
         state.currentPlayer = data.currentPlayer || 1;
         state.gameActive = true;
         state.moveCount = 0;
         state.lastDroppedCell = null;
+        
+        console.log('Joined room - currentPlayer:', state.currentPlayer, 'myPlayerNumber:', state.myPlayerNumber);
         
         // Update UI
         const setupModal = document.getElementById('setupModal');
@@ -761,6 +776,8 @@
                 state.board[move.row][move.col] = move.player;
                 state.lastDroppedCell = { row: move.row, col: move.col };
                 state.moveCount++;
+                
+                // CRITICAL FIX: Update current player from Firebase data
                 state.currentPlayer = data.currentPlayer;
                 
                 renderBoard(true);
@@ -773,7 +790,17 @@
                 } else {
                     updatePlayerIndicator();
                 }
+            } else if (data.lastMove.player === state.myPlayerNumber) {
+                // CRITICAL FIX: Also update current player when it's our own move
+                state.currentPlayer = data.currentPlayer;
+                updatePlayerIndicator();
             }
+        }
+        
+        // CRITICAL FIX: Always sync current player from Firebase
+        if (data.currentPlayer !== undefined && data.currentPlayer !== state.currentPlayer) {
+            state.currentPlayer = data.currentPlayer;
+            updatePlayerIndicator();
         }
         
         // Sync game state
