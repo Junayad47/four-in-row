@@ -447,49 +447,38 @@ body {
     }
 }
 
-/* STUNNING Room Code Display */
+/* Room Code Display - Consistent with Victory Screen Style */
 .room-code-display {
-    background: linear-gradient(135deg, 
-        rgba(0,0,0,0.9) 0%, 
-        rgba(26,26,46,0.9) 50%, 
-        rgba(0,0,0,0.9) 100%);
-    border: 3px solid transparent;
-    background-clip: padding-box;
-    position: relative;
-    border-radius: 20px;
+    background: linear-gradient(135deg, var(--card-bg), rgba(10,10,15,0.95));
+    border: 3px solid var(--neon-yellow);
+    border-radius: var(--border-radius);
     padding: 2.5rem 3rem;
     margin: 2rem auto;
     text-align: center;
-    max-width: 400px;
+    max-width: 420px;
     box-shadow: 
-        0 0 60px rgba(255,255,0,0.3),
-        inset 0 0 60px rgba(255,0,110,0.1);
+        0 0 50px rgba(255,255,0,0.8),
+        inset 0 0 30px rgba(255,255,0,0.1);
+    position: relative;
+    animation: fadeIn 0.5s ease-out;
 }
 
 .room-code-display::before {
     content: '';
     position: absolute;
-    top: -3px;
-    left: -3px;
-    right: -3px;
-    bottom: -3px;
-    background: linear-gradient(45deg, 
-        var(--neon-yellow), 
-        var(--neon-pink), 
-        var(--neon-cyan), 
-        var(--neon-yellow));
-    border-radius: 20px;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    background: radial-gradient(circle, rgba(255,255,0,0.2), transparent);
+    border-radius: var(--border-radius);
     z-index: -1;
-    animation: borderRotate 3s linear infinite;
+    animation: pulseGlow 3s ease-in-out infinite;
 }
 
-@keyframes borderRotate {
-    0% { 
-        filter: hue-rotate(0deg);
-    }
-    100% { 
-        filter: hue-rotate(360deg);
-    }
+@keyframes pulseGlow {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
 }
 
 .room-code-label {
@@ -500,65 +489,71 @@ body {
     margin-bottom: 1.5rem;
     font-weight: 600;
     text-shadow: 0 0 10px rgba(0,255,255,0.5);
+    animation: fadeIn 0.6s ease-out 0.2s backwards;
 }
 
 .room-code-value {
-    font-size: 3.5rem;
+    font-size: clamp(2.5rem, 5vw, 3.5rem);
     font-weight: 900;
-    color: var(--neon-yellow);
+    background: linear-gradient(45deg, var(--neon-yellow), var(--neon-pink));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
     letter-spacing: 8px;
     text-shadow: 
-        0 0 20px rgba(255,255,0,0.8),
-        0 0 40px rgba(255,255,0,0.5),
-        0 0 60px rgba(255,255,0,0.3);
-    animation: codeGlow 2s ease-in-out infinite alternate;
+        0 0 30px rgba(255,255,0,0.8);
+    animation: glowPulse 2s ease-in-out infinite alternate;
     font-family: 'Orbitron', monospace;
-    margin: 1rem 0;
-    padding: 0.5rem;
-    background: linear-gradient(90deg, 
-        transparent, 
-        rgba(255,255,0,0.1), 
-        transparent);
-    border-radius: 10px;
+    margin: 1.5rem 0;
+    padding: 1rem;
+    position: relative;
 }
 
-@keyframes codeGlow {
+.room-code-value::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--neon-yellow), transparent);
+    animation: slideGlow 2s linear infinite;
+}
+
+@keyframes slideGlow {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+@keyframes glowPulse {
     from { 
-        transform: scale(1);
-        filter: brightness(1);
+        filter: brightness(1) drop-shadow(0 0 20px rgba(255,255,0,0.6));
     }
     to { 
-        transform: scale(1.05);
-        filter: brightness(1.2);
+        filter: brightness(1.2) drop-shadow(0 0 30px rgba(255,255,0,0.9));
     }
 }
 
 .room-code-display #copyCode {
-    margin-top: 1.5rem;
+    margin-top: 2rem;
     background: linear-gradient(45deg, var(--neon-cyan), var(--neon-purple));
-    padding: 0.8rem 2rem;
-    min-width: 150px;
+    padding: 1rem 2.5rem;
+    min-width: 180px;
     position: relative;
     overflow: hidden;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
 }
 
-.room-code-display #copyCode::after {
-    content: '📋';
-    position: absolute;
-    right: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1.2rem;
-    opacity: 0.8;
+.room-code-display #copyCode:hover {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 30px rgba(0,255,255,0.6);
 }
 
 .room-code-display #copyCode.success {
     background: linear-gradient(45deg, var(--neon-green), var(--neon-cyan));
+    border-color: var(--neon-green);
     animation: successPulse 0.6s ease-out;
-}
-
-.room-code-display #copyCode.success::after {
-    content: '✅';
 }
 
 @keyframes successPulse {
@@ -570,74 +565,60 @@ body {
 .waiting-message {
     text-align: center;
     color: var(--neon-cyan);
-    margin-top: 2rem;
+    margin-top: 2.5rem;
     font-size: 1.1rem;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     text-transform: uppercase;
     animation: waitingPulse 2s infinite;
+    text-shadow: 0 0 10px rgba(0,255,255,0.4);
 }
 
 @keyframes waitingPulse {
     0%, 100% { 
-        opacity: 0.6;
-        transform: scale(1);
+        opacity: 0.7;
+        transform: translateY(0);
     }
     50% { 
         opacity: 1;
-        transform: scale(1.05);
+        transform: translateY(-3px);
     }
 }
 
-/* Enhanced Loading Spinner */
-.loading-spinner,
-.loading-spinner-large {
-    width: 60px;
-    height: 60px;
-    border: 3px solid transparent;
+/* Enhanced Loading Spinner - Consistent Style */
+.creating-section .loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(0,255,255,0.2);
     border-top: 3px solid var(--neon-cyan);
     border-right: 3px solid var(--neon-pink);
-    border-bottom: 3px solid var(--neon-yellow);
     border-radius: 50%;
-    animation: enhancedSpin 1s linear infinite;
-    margin: 1.5rem auto;
+    animation: spin 1s linear infinite;
+    margin: 2rem auto;
     box-shadow: 
-        0 0 20px rgba(0,255,255,0.5),
-        inset 0 0 20px rgba(255,0,110,0.2);
+        0 0 20px rgba(0,255,255,0.3),
+        inset 0 0 10px rgba(255,0,110,0.1);
 }
 
-.loading-spinner {
-    width: 45px;
-    height: 45px;
-}
-
-@keyframes enhancedSpin {
-    0% { 
-        transform: rotate(0deg);
-        filter: hue-rotate(0deg);
-    }
-    100% { 
-        transform: rotate(360deg);
-        filter: hue-rotate(360deg);
-    }
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 /* Creating Section Specific Styles */
-.creating-section .loading-spinner {
-    margin: 2rem auto;
-}
-
 .creating-section > * {
     margin-bottom: 1rem;
 }
 
 /* Join Room Section Enhanced */
 .join-section.active {
-    padding: 1rem;
-    background: linear-gradient(135deg, 
-        rgba(0,0,0,0.3) 0%, 
-        rgba(26,26,46,0.3) 100%);
-    border-radius: 15px;
-    border: 1px solid rgba(0,255,255,0.2);
+    padding: 1.5rem;
+    background: var(--card-bg);
+    border: 2px solid var(--neon-purple);
+    border-radius: var(--border-radius);
+    box-shadow: 
+        0 0 20px rgba(179,0,255,0.3),
+        inset 0 0 20px rgba(179,0,255,0.05);
+    animation: slideInFromRight 0.4s ease-out;
 }
 
 .join-section .input-group {
