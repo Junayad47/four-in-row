@@ -1,4 +1,4 @@
-// game.js - Core Game Logic (COMPLETE VERSION)
+// game.js - Core Game Logic (FIXED VERSION)
 
 (function(window) {
     'use strict';
@@ -21,6 +21,7 @@
         startTime: null,
         moveCount: 0,
         lastDroppedCell: null, // Track only the last dropped disc
+        lastMoveTimestamp: null, // Track timestamp for online sync
         // Online specific
         roomCode: null,
         isHost: false,
@@ -62,7 +63,7 @@
         }
     }
     
-    // Setup board event listeners
+    // Setup board event listeners - FIXED for mobile
     function setupBoardEventListeners() {
         const board = document.getElementById('gameBoard');
         if (!board) return;
@@ -75,110 +76,80 @@
         newBoard.addEventListener('click', handleBoardClick);
         newBoard.addEventListener('mouseover', handleBoardHover);
         newBoard.addEventListener('mouseout', handleBoardHoverOut);
-        newBoard.addEventListener('touchstart', handleTouchStart, { passive: true });
+        
+        // FIXED: Better mobile touch handling
+        newBoard.addEventListener('touchstart', handleTouchStart, { passive: false });
+        newBoard.addEventListener('touchend', handleTouchEnd, { passive: false });
     }
     
-    // Handle touch start
+    // FIXED: Handle touch start
     function handleTouchStart(e) {
+        e.preventDefault(); // Prevent default touch behavior
         const touch = e.touches[0];
         const element = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (element && element.classList.contains('cell')) {
+            const col = parseInt(element.dataset.col);
+            showPreview(col);
+        }
+    }
+    
+    // FIXED: Handle touch end
+    function handleTouchEnd(e) {
+        e.preventDefault(); // Prevent default touch behavior
+        const touch = e.changedTouches[0];
+        const element = document.elementFromPoint(touch.clientX, touch.clientY);
+        hidePreview();
         if (element && element.classList.contains('cell')) {
             const col = parseInt(element.dataset.col);
             selectColumn(col);
         }
     }
     
-    // Render board - FIXED to only animate the last dropped disc
+    // Render board - COMPLETELY FIXED animation logic
     function renderBoard(animateLastDrop = true) {
         const boardEl = document.getElementById('gameBoard');
         if (!boardEl) return;
         
-        // Store existing cells to avoid recreating
-        const existingCells = boardEl.querySelectorAll('.cell');
-        const shouldRebuild = existingCells.length !== ROWS * COLS;
+        boardEl.innerHTML = ''; // Always rebuild for simplicity and reliability
         
-        if (shouldRebuild) {
-            // Full rebuild only if necessary
-            boardEl.innerHTML = '';
-            
-            for (let row = 0; row < ROWS; row++) {
-                for (let col = 0; col < COLS; col++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'cell';
-                    cell.dataset.row = row;
-                    cell.dataset.col = col;
+        for (let row = 0; row < ROWS; row++) {
+            for (let col = 0; col < COLS; col++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+                
+                if (state.board[row][col] !== 0) {
+                    cell.classList.add('filled');
+                    const disc = document.createElement('div');
                     
-                    if (state.board[row][col] !== 0) {
-                        cell.classList.add('filled');
-                        const disc = document.createElement('div');
-                        
-                        // Only animate if this is the last dropped disc
-                        const shouldAnimate = animateLastDrop && 
-                                            state.lastDroppedCell && 
-                                            state.lastDroppedCell.row === row && 
-                                            state.lastDroppedCell.col === col;
-                        
-                        if (shouldAnimate) {
-                            disc.className = `watermelon-disc watermelon-player${state.board[row][col]} drop-animation`;
-                        } else {
-                            disc.className = `watermelon-disc watermelon-player${state.board[row][col]}`;
-                        }
-                        
-                        cell.appendChild(disc);
+                    // FIXED: Only animate the specific last dropped disc
+                    if (animateLastDrop && 
+                        state.lastDroppedCell && 
+                        state.lastDroppedCell.row === row && 
+                        state.lastDroppedCell.col === col) {
+                        disc.className = `watermelon-disc watermelon-player${state.board[row][col]} drop-animation`;
+                        // Clear the lastDroppedCell after animation starts
+                        setTimeout(() => {
+                            state.lastDroppedCell = null;
+                        }, 600);
+                    } else {
+                        disc.className = `watermelon-disc watermelon-player${state.board[row][col]}`;
                     }
                     
-                    boardEl.appendChild(cell);
+                    cell.appendChild(disc);
                 }
-            }
-        } else {
-            // Update existing cells
-            for (let row = 0; row < ROWS; row++) {
-                for (let col = 0; col < COLS; col++) {
-                    const index = row * COLS + col;
-                    const cell = existingCells[index];
-                    const value = state.board[row][col];
-                    const currentDisc = cell.querySelector('.watermelon-disc');
-                    
-                    if (value === 0 && currentDisc) {
-                        // Remove disc
-                        cell.classList.remove('filled');
-                        cell.innerHTML = '';
-                    } else if (value !== 0 && !currentDisc) {
-                        // Add new disc
-                        cell.classList.add('filled');
-                        const disc = document.createElement('div');
-                        
-                        // Only animate if this is the last dropped disc
-                        const shouldAnimate = animateLastDrop && 
-                                            state.lastDroppedCell && 
-                                            state.lastDroppedCell.row === row && 
-                                            state.lastDroppedCell.col === col;
-                        
-                        if (shouldAnimate) {
-                            disc.className = `watermelon-disc watermelon-player${value} drop-animation`;
-                        } else {
-                            disc.className = `watermelon-disc watermelon-player${value}`;
-                        }
-                        
-                        cell.appendChild(disc);
-                    }
-                }
+                
+                boardEl.appendChild(cell);
             }
         }
         
         // Check for danger moves (opponent can win)
         checkForDangerMoves();
         updatePlayerIndicator();
-        
-        // Clear last dropped cell after rendering
-        if (animateLastDrop) {
-            setTimeout(() => {
-                state.lastDroppedCell = null;
-            }, 500);
-        }
     }
     
-    // Check for danger moves - RESTORED FEATURE
+    // Check for danger moves
     function checkForDangerMoves() {
         if (!state.gameActive) return;
         
@@ -221,7 +192,7 @@
         }
     }
     
-    // Handle board click - FIXED
+    // Handle board click - FIXED for online mode
     function handleBoardClick(e) {
         if (!state.gameActive) {
             console.log('Game not active');
@@ -233,12 +204,10 @@
         
         const col = parseInt(cell.dataset.col);
         
-        // Debug logging
-        console.log('Click - Current player:', state.currentPlayer, 'My number:', state.myPlayerNumber);
-        
-        // For online mode, check if it's player's turn
+        // FIXED: For online mode, check if it's player's turn
         if (state.mode === 'online') {
-            if (state.currentPlayer !== state.myPlayerNumber) {
+            console.log('Online mode - Current:', state.currentPlayer, 'My:', state.myPlayerNumber);
+            if (state.myPlayerNumber && state.currentPlayer !== state.myPlayerNumber) {
                 showToast("It's not your turn!", 'error');
                 return;
             }
@@ -285,7 +254,7 @@
         playSound('select');
     }
     
-    // Confirm move
+    // Confirm move - FIXED for online mode
     function confirmMove() {
         if (state.pendingMove === null) return;
         
@@ -321,11 +290,10 @@
             }
             endGame(0);
         } else {
-            // Switch players BEFORE sending to Firebase
-            const previousPlayer = state.currentPlayer;
+            // Switch players
             state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
             
-            // For online mode, send move to Firebase with new current player
+            // For online mode, send move to Firebase
             if (state.mode === 'online') {
                 sendMoveToFirebase(row, col, false, false);
             }
@@ -647,7 +615,7 @@
         }, 1000);
     }
     
-    // Create online room
+    // Create online room - FIXED
     async function createOnlineRoom(playerName) {
         if (!window.firebase || !window.firebase.apps || !window.firebase.apps.length) {
             throw new Error('Firebase not initialized');
@@ -656,7 +624,7 @@
         state.db = window.firebase.database();
         state.roomCode = generateRoomCode();
         state.isHost = true;
-        state.myPlayerNumber = 1;
+        state.myPlayerNumber = 1; // Host is always player 1
         state.player1.name = playerName;
         
         // Clean up existing listener
@@ -689,7 +657,7 @@
         return state.roomCode;
     }
     
-    // Join online room - FIXED
+    // Join online room - FULLY FIXED
     async function joinOnlineRoom(roomCode, playerName) {
         if (!window.firebase || !window.firebase.apps || !window.firebase.apps.length) {
             throw new Error('Firebase not initialized');
@@ -698,7 +666,7 @@
         state.db = window.firebase.database();
         state.roomCode = roomCode;
         state.isHost = false;
-        state.myPlayerNumber = 2;
+        state.myPlayerNumber = 2; // Joiner is always player 2
         state.player2.name = playerName;
         
         // Clean up existing listener
@@ -721,53 +689,38 @@
         
         state.player1.name = data.player1;
         
-        // Update room with ALL required fields
-        await state.roomRef.update({
-            host: data.host, // Keep the host
-            player1: data.player1, // Keep player1
-            player2: playerName,
-            board: data.board || state.board, // Keep or initialize board
-            currentPlayer: data.currentPlayer || 1, // Keep or set current player
-            gameActive: true,
-            gameStarted: true,
-            lastMove: data.lastMove || null // Keep or null
-        });
-        
-        // Listen for changes BEFORE starting game
+        // Listen for changes FIRST
         state.roomListener = handleRoomUpdate;
         state.roomRef.on('value', state.roomListener);
         
-        // Update UI and start game for Player 2
+        // Update room with player 2 joining
+        await state.roomRef.update({
+            player2: playerName,
+            gameActive: true,
+            gameStarted: true
+        });
+        
+        // Update UI
         const p1Name = document.getElementById('p1Name');
         const p2Name = document.getElementById('p2Name');
         if (p1Name) p1Name.textContent = state.player1.name;
         if (p2Name) p2Name.textContent = state.player2.name;
         
-        const setupModal = document.getElementById('setupModal');
-        const gameArea = document.getElementById('gameArea');
-        if (setupModal) setupModal.classList.remove('active');
-        if (gameArea) gameArea.classList.add('active');
-        
-        // Initialize board from Firebase data
-        if (data.board) {
-            state.board = data.board;
-        }
+        // Initialize game state
+        state.board = data.board || Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
         state.currentPlayer = data.currentPlayer || 1;
-        
-        // Start the game with correct state
         state.gameActive = true;
         state.moveCount = 0;
         state.lastDroppedCell = null;
+        
         renderBoard(false);
         startTimer();
         updatePlayerIndicator();
         
-        showToast('Joined game successfully!', 'success');
-        
         return true;
     }
     
-    // Handle room updates
+    // Handle room updates - FIXED
     function handleRoomUpdate(snapshot) {
         const data = snapshot.val();
         if (!data) return;
@@ -788,10 +741,34 @@
             showToast(`${data.player2} joined the game!`, 'success');
         }
         
-        // Update current player from Firebase
-        if (data.currentPlayer !== undefined) {
-            state.currentPlayer = data.currentPlayer;
-            updatePlayerIndicator();
+        // Handle game updates from opponent
+        if (data.lastMove && 
+            data.lastMove.timestamp && 
+            (!state.lastMoveTimestamp || data.lastMove.timestamp > state.lastMoveTimestamp)) {
+            
+            state.lastMoveTimestamp = data.lastMove.timestamp;
+            
+            // Only update if move was made by opponent
+            if (data.lastMove.player !== state.myPlayerNumber) {
+                const move = data.lastMove;
+                state.board[move.row][move.col] = move.player;
+                state.lastDroppedCell = { row: move.row, col: move.col };
+                state.moveCount++;
+                
+                // Update current player
+                state.currentPlayer = data.currentPlayer;
+                
+                renderBoard(true);
+                playSound('drop');
+                
+                if (move.isWin) {
+                    endGame(move.player);
+                } else if (move.isDraw) {
+                    endGame(0);
+                } else {
+                    updatePlayerIndicator();
+                }
+            }
         }
         
         // Update game state
@@ -799,41 +776,25 @@
             state.gameActive = data.gameActive;
         }
         
-        // Update board if changed by opponent
-        if (data.lastMove && data.lastMove.player !== state.myPlayerNumber) {
-            const move = data.lastMove;
-            state.board[move.row][move.col] = move.player;
-            state.lastDroppedCell = { row: move.row, col: move.col };
-            state.moveCount++;
-            
-            // Update current player to match Firebase state
+        // Sync current player
+        if (data.currentPlayer !== undefined && !data.lastMove) {
             state.currentPlayer = data.currentPlayer;
-            
-            renderBoard(true);
-            playSound('drop');
-            
-            if (move.isWin) {
-                endGame(move.player);
-            } else if (move.isDraw) {
-                endGame(0);
-            } else {
-                updatePlayerIndicator();
-            }
+            updatePlayerIndicator();
         }
     }
     
-    // Send move to Firebase
+    // Send move to Firebase - FIXED
     async function sendMoveToFirebase(row, col, isWin = false, isDraw = false) {
         if (!state.roomRef) return;
         
         try {
             await state.roomRef.update({
                 board: state.board,
-                currentPlayer: state.currentPlayer, // This is already the NEXT player
+                currentPlayer: state.currentPlayer,
                 lastMove: {
                     row: row,
                     col: col,
-                    player: state.myPlayerNumber, // Who made the move
+                    player: state.myPlayerNumber,
                     isWin: isWin,
                     isDraw: isDraw,
                     timestamp: Date.now()
