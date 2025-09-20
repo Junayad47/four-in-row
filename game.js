@@ -1,4 +1,4 @@
-// game.js - Core Game Logic (FIXED VERSION)
+// game.js - Core Game Logic (PROPERLY FIXED VERSION)
 
 (function(window) {
     'use strict';
@@ -20,15 +20,15 @@
         pendingMove: null,
         startTime: null,
         moveCount: 0,
-        lastDroppedCell: null, // Track only the last dropped disc
-        lastMoveTimestamp: null, // Track timestamp for online sync
-        // Online specific
+        lastDroppedCell: null,
+        // Online specific - FIXED
         roomCode: null,
         isHost: false,
         myPlayerNumber: null,
         db: null,
         roomRef: null,
-        roomListener: null
+        roomListener: null,
+        processedMoves: new Set() // Track processed moves to avoid duplicates
     };
     
     // Timer variables
@@ -45,7 +45,7 @@
     function initializeBoard() {
         state.board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
         state.lastDroppedCell = null;
-        renderBoard(false); // Don't animate on init
+        renderBoard(false);
     }
     
     // Setup column indicators
@@ -63,7 +63,7 @@
         }
     }
     
-    // Setup board event listeners - FIXED for mobile
+    // Setup board event listeners - WITH MOBILE SUPPORT
     function setupBoardEventListeners() {
         const board = document.getElementById('gameBoard');
         if (!board) return;
@@ -77,14 +77,14 @@
         newBoard.addEventListener('mouseover', handleBoardHover);
         newBoard.addEventListener('mouseout', handleBoardHoverOut);
         
-        // FIXED: Better mobile touch handling
+        // Mobile touch handling
         newBoard.addEventListener('touchstart', handleTouchStart, { passive: false });
         newBoard.addEventListener('touchend', handleTouchEnd, { passive: false });
     }
     
-    // FIXED: Handle touch start
+    // Handle touch start
     function handleTouchStart(e) {
-        e.preventDefault(); // Prevent default touch behavior
+        e.preventDefault();
         const touch = e.touches[0];
         const element = document.elementFromPoint(touch.clientX, touch.clientY);
         if (element && element.classList.contains('cell')) {
@@ -93,9 +93,9 @@
         }
     }
     
-    // FIXED: Handle touch end
+    // Handle touch end  
     function handleTouchEnd(e) {
-        e.preventDefault(); // Prevent default touch behavior
+        e.preventDefault();
         const touch = e.changedTouches[0];
         const element = document.elementFromPoint(touch.clientX, touch.clientY);
         hidePreview();
@@ -105,12 +105,12 @@
         }
     }
     
-    // Render board - COMPLETELY FIXED animation logic
+    // Render board - FIXED ANIMATION
     function renderBoard(animateLastDrop = true) {
         const boardEl = document.getElementById('gameBoard');
         if (!boardEl) return;
         
-        boardEl.innerHTML = ''; // Always rebuild for simplicity and reliability
+        boardEl.innerHTML = '';
         
         for (let row = 0; row < ROWS; row++) {
             for (let col = 0; col < COLS; col++) {
@@ -123,16 +123,12 @@
                     cell.classList.add('filled');
                     const disc = document.createElement('div');
                     
-                    // FIXED: Only animate the specific last dropped disc
+                    // Only animate the last dropped disc
                     if (animateLastDrop && 
                         state.lastDroppedCell && 
                         state.lastDroppedCell.row === row && 
                         state.lastDroppedCell.col === col) {
                         disc.className = `watermelon-disc watermelon-player${state.board[row][col]} drop-animation`;
-                        // Clear the lastDroppedCell after animation starts
-                        setTimeout(() => {
-                            state.lastDroppedCell = null;
-                        }, 600);
                     } else {
                         disc.className = `watermelon-disc watermelon-player${state.board[row][col]}`;
                     }
@@ -144,7 +140,13 @@
             }
         }
         
-        // Check for danger moves (opponent can win)
+        // Clear last dropped cell after animation
+        if (animateLastDrop && state.lastDroppedCell) {
+            setTimeout(() => {
+                state.lastDroppedCell = null;
+            }, 600);
+        }
+        
         checkForDangerMoves();
         updatePlayerIndicator();
     }
@@ -155,7 +157,6 @@
         
         const cells = document.querySelectorAll('.cell');
         
-        // Clear previous danger indicators
         cells.forEach(cell => {
             cell.classList.remove('danger');
             cell.classList.remove('win-opportunity');
@@ -163,51 +164,40 @@
         
         const opponent = state.currentPlayer === 1 ? 2 : 1;
         
-        // Check if opponent can win (danger)
         for (let col = 0; col < COLS; col++) {
             const row = getLowestEmptyRow(col);
             if (row === -1) continue;
             
-            // Simulate opponent's move
+            // Check if opponent can win
             state.board[row][col] = opponent;
             if (checkWin(row, col, false)) {
                 const index = row * COLS + col;
                 cells[index].classList.add('danger');
             }
-            state.board[row][col] = 0; // Undo simulation
-        }
-        
-        // Check if current player can win (opportunity)
-        for (let col = 0; col < COLS; col++) {
-            const row = getLowestEmptyRow(col);
-            if (row === -1) continue;
+            state.board[row][col] = 0;
             
-            // Simulate current player's move
+            // Check if current player can win
             state.board[row][col] = state.currentPlayer;
             if (checkWin(row, col, false)) {
                 const index = row * COLS + col;
                 cells[index].classList.add('win-opportunity');
             }
-            state.board[row][col] = 0; // Undo simulation
+            state.board[row][col] = 0;
         }
     }
     
-    // Handle board click - FIXED for online mode
+    // Handle board click
     function handleBoardClick(e) {
-        if (!state.gameActive) {
-            console.log('Game not active');
-            return;
-        }
+        if (!state.gameActive) return;
         
         const cell = e.target.closest('.cell');
         if (!cell) return;
         
         const col = parseInt(cell.dataset.col);
         
-        // FIXED: For online mode, check if it's player's turn
+        // For online mode, check turn
         if (state.mode === 'online') {
-            console.log('Online mode - Current:', state.currentPlayer, 'My:', state.myPlayerNumber);
-            if (state.myPlayerNumber && state.currentPlayer !== state.myPlayerNumber) {
+            if (state.currentPlayer !== state.myPlayerNumber) {
                 showToast("It's not your turn!", 'error');
                 return;
             }
@@ -254,7 +244,7 @@
         playSound('select');
     }
     
-    // Confirm move - FIXED for online mode
+    // Confirm move
     function confirmMove() {
         if (state.pendingMove === null) return;
         
@@ -263,10 +253,11 @@
         
         if (row === -1) return;
         
-        // Make the move
-        state.board[row][col] = state.currentPlayer;
-        state.lastDroppedCell = { row, col }; // Track for animation
-        state.moveHistory.push({ row, col, player: state.currentPlayer });
+        // Make the move with CURRENT player
+        const movingPlayer = state.currentPlayer;
+        state.board[row][col] = movingPlayer;
+        state.lastDroppedCell = { row, col };
+        state.moveHistory.push({ row, col, player: movingPlayer });
         state.moveCount++;
         
         // Hide confirmation
@@ -274,28 +265,26 @@
         if (moveConfirm) moveConfirm.classList.remove('active');
         state.pendingMove = null;
         
-        // Play sound and render with animation
         playSound('drop');
         renderBoard(true);
         
-        // Check for win
+        // Check for win with the player who just moved
         if (checkWin(row, col, true)) {
             if (state.mode === 'online') {
-                sendMoveToFirebase(row, col, true, false);
+                sendMoveToFirebase(row, col, movingPlayer, true, false);
             }
-            endGame(state.currentPlayer);
+            endGame(movingPlayer);
         } else if (checkDraw()) {
             if (state.mode === 'online') {
-                sendMoveToFirebase(row, col, false, true);
+                sendMoveToFirebase(row, col, movingPlayer, false, true);
             }
             endGame(0);
         } else {
             // Switch players
             state.currentPlayer = state.currentPlayer === 1 ? 2 : 1;
             
-            // For online mode, send move to Firebase
             if (state.mode === 'online') {
-                sendMoveToFirebase(row, col, false, false);
+                sendMoveToFirebase(row, col, movingPlayer, false, false);
             }
             
             updatePlayerIndicator();
@@ -323,8 +312,8 @@
     // Check for win
     function checkWin(row, col, highlight = true) {
         const player = state.board[row][col];
+        if (player === 0) return false;
         
-        // Check all four directions
         const horizontal = checkDirection(row, col, 0, 1, player);
         const vertical = checkDirection(row, col, 1, 0, player);
         const diagonal1 = checkDirection(row, col, 1, 1, player);
@@ -457,7 +446,6 @@
         const winMoves = document.getElementById('winMoves');
         const winTime = document.getElementById('winTime');
         
-        // Calculate game time
         const gameTime = Math.floor((Date.now() - state.startTime) / 1000);
         const minutes = Math.floor(gameTime / 60);
         const seconds = gameTime % 60;
@@ -473,7 +461,6 @@
             if (winTitle) winTitle.textContent = "🎉 Victory! 🎉";
             if (winPlayer) winPlayer.textContent = `${playerName} Wins!`;
             
-            // Update score
             if (winner === 1) {
                 state.player1.score++;
                 const p1Score = document.getElementById('p1Score');
@@ -487,7 +474,6 @@
         
         if (winOverlay) winOverlay.classList.add('active');
         
-        // Trigger confetti
         if (window.ParticleSystem && window.ParticleSystem.celebrate) {
             window.ParticleSystem.celebrate();
         }
@@ -499,10 +485,12 @@
         state.currentPlayer = 1;
         state.moveCount = 0;
         state.lastDroppedCell = null;
+        state.processedMoves.clear();
         initializeBoard();
         startTimer();
+        updatePlayerIndicator();
         
-        // Ensure names are displayed
+        // Update UI with names
         const p1Name = document.getElementById('p1Name');
         const p2Name = document.getElementById('p2Name');
         if (p1Name && state.player1.name) p1Name.textContent = state.player1.name;
@@ -615,7 +603,7 @@
         }, 1000);
     }
     
-    // Create online room - FIXED
+    // Create online room - COMPLETELY FIXED
     async function createOnlineRoom(playerName) {
         if (!window.firebase || !window.firebase.apps || !window.firebase.apps.length) {
             throw new Error('Firebase not initialized');
@@ -624,8 +612,9 @@
         state.db = window.firebase.database();
         state.roomCode = generateRoomCode();
         state.isHost = true;
-        state.myPlayerNumber = 1; // Host is always player 1
+        state.myPlayerNumber = 1;
         state.player1.name = playerName;
+        state.processedMoves.clear();
         
         // Clean up existing listener
         if (state.roomListener && state.roomRef) {
@@ -634,11 +623,12 @@
         
         state.roomRef = state.db.ref(`rooms/${state.roomCode}`);
         
+        // Set initial room data
         await state.roomRef.set({
             host: playerName,
             player1: playerName,
             player2: null,
-            board: state.board,
+            board: Array(ROWS).fill(null).map(() => Array(COLS).fill(0)),
             currentPlayer: 1,
             gameActive: false,
             lastMove: null,
@@ -650,14 +640,14 @@
         state.roomListener = handleRoomUpdate;
         state.roomRef.on('value', state.roomListener);
         
-        // Update UI
+        // Update UI - DON'T CHANGE THE NAME
         const p1Name = document.getElementById('p1Name');
         if (p1Name) p1Name.textContent = playerName;
         
         return state.roomCode;
     }
     
-    // Join online room - FULLY FIXED
+    // Join online room - COMPLETELY FIXED
     async function joinOnlineRoom(roomCode, playerName) {
         if (!window.firebase || !window.firebase.apps || !window.firebase.apps.length) {
             throw new Error('Firebase not initialized');
@@ -666,8 +656,9 @@
         state.db = window.firebase.database();
         state.roomCode = roomCode;
         state.isHost = false;
-        state.myPlayerNumber = 2; // Joiner is always player 2
+        state.myPlayerNumber = 2;
         state.player2.name = playerName;
+        state.processedMoves.clear();
         
         // Clean up existing listener
         if (state.roomListener && state.roomRef) {
@@ -676,6 +667,7 @@
         
         state.roomRef = state.db.ref(`rooms/${roomCode}`);
         
+        // Get room data
         const snapshot = await state.roomRef.once('value');
         const data = snapshot.val();
         
@@ -683,28 +675,23 @@
             throw new Error('Room not found');
         }
         
-        if (data.player2) {
+        if (data.player2 && data.player2 !== playerName) {
             throw new Error('Room is full');
         }
         
+        // Set player 1 name from room data
         state.player1.name = data.player1;
         
-        // Listen for changes FIRST
+        // Listen for changes BEFORE updating
         state.roomListener = handleRoomUpdate;
         state.roomRef.on('value', state.roomListener);
         
-        // Update room with player 2 joining
+        // Update room with player 2
         await state.roomRef.update({
             player2: playerName,
             gameActive: true,
             gameStarted: true
         });
-        
-        // Update UI
-        const p1Name = document.getElementById('p1Name');
-        const p2Name = document.getElementById('p2Name');
-        if (p1Name) p1Name.textContent = state.player1.name;
-        if (p2Name) p2Name.textContent = state.player2.name;
         
         // Initialize game state
         state.board = data.board || Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
@@ -713,49 +700,67 @@
         state.moveCount = 0;
         state.lastDroppedCell = null;
         
+        // Update UI
+        const setupModal = document.getElementById('setupModal');
+        const gameArea = document.getElementById('gameArea');
+        if (setupModal) setupModal.classList.remove('active');
+        if (gameArea) gameArea.classList.add('active');
+        
+        const p1Name = document.getElementById('p1Name');
+        const p2Name = document.getElementById('p2Name');
+        if (p1Name) p1Name.textContent = state.player1.name;
+        if (p2Name) p2Name.textContent = state.player2.name;
+        
         renderBoard(false);
         startTimer();
         updatePlayerIndicator();
         
+        showToast('Joined game successfully!', 'success');
+        
         return true;
     }
     
-    // Handle room updates - FIXED
+    // Handle room updates - COMPLETELY FIXED
     function handleRoomUpdate(snapshot) {
         const data = snapshot.val();
         if (!data) return;
         
         // For host: when player 2 joins
-        if (state.isHost && data.player2 && !state.player2.name) {
+        if (state.isHost && data.player2 && !state.player2.name && data.gameStarted) {
             state.player2.name = data.player2;
+            
             const p2Name = document.getElementById('p2Name');
             if (p2Name) p2Name.textContent = data.player2;
             
             const setupModal = document.getElementById('setupModal');
             const gameArea = document.getElementById('gameArea');
-            
             if (setupModal) setupModal.classList.remove('active');
             if (gameArea) gameArea.classList.add('active');
             
-            startGame();
+            // Start game for host
+            state.gameActive = true;
+            state.currentPlayer = 1;
+            state.moveCount = 0;
+            state.lastDroppedCell = null;
+            renderBoard(false);
+            startTimer();
+            updatePlayerIndicator();
+            
             showToast(`${data.player2} joined the game!`, 'success');
         }
         
-        // Handle game updates from opponent
-        if (data.lastMove && 
-            data.lastMove.timestamp && 
-            (!state.lastMoveTimestamp || data.lastMove.timestamp > state.lastMoveTimestamp)) {
+        // Handle moves from opponent
+        if (data.lastMove) {
+            const moveId = `${data.lastMove.row}-${data.lastMove.col}-${data.lastMove.timestamp}`;
             
-            state.lastMoveTimestamp = data.lastMove.timestamp;
-            
-            // Only update if move was made by opponent
-            if (data.lastMove.player !== state.myPlayerNumber) {
+            // Check if this is a new move we haven't processed
+            if (!state.processedMoves.has(moveId) && data.lastMove.player !== state.myPlayerNumber) {
+                state.processedMoves.add(moveId);
+                
                 const move = data.lastMove;
                 state.board[move.row][move.col] = move.player;
                 state.lastDroppedCell = { row: move.row, col: move.col };
                 state.moveCount++;
-                
-                // Update current player
                 state.currentPlayer = data.currentPlayer;
                 
                 renderBoard(true);
@@ -771,38 +776,38 @@
             }
         }
         
-        // Update game state
+        // Sync game state
         if (data.gameActive !== undefined) {
             state.gameActive = data.gameActive;
-        }
-        
-        // Sync current player
-        if (data.currentPlayer !== undefined && !data.lastMove) {
-            state.currentPlayer = data.currentPlayer;
-            updatePlayerIndicator();
         }
     }
     
     // Send move to Firebase - FIXED
-    async function sendMoveToFirebase(row, col, isWin = false, isDraw = false) {
+    async function sendMoveToFirebase(row, col, player, isWin = false, isDraw = false) {
         if (!state.roomRef) return;
         
         try {
+            const timestamp = Date.now();
             await state.roomRef.update({
                 board: state.board,
                 currentPlayer: state.currentPlayer,
                 lastMove: {
                     row: row,
                     col: col,
-                    player: state.myPlayerNumber,
+                    player: player,
                     isWin: isWin,
                     isDraw: isDraw,
-                    timestamp: Date.now()
-                }
+                    timestamp: timestamp
+                },
+                gameActive: !isWin && !isDraw
             });
+            
+            // Add to processed moves
+            const moveId = `${row}-${col}-${timestamp}`;
+            state.processedMoves.add(moveId);
         } catch (error) {
-            console.error('Error sending move to Firebase:', error);
-            showToast('Failed to send move. Please check connection.', 'error');
+            console.error('Error sending move:', error);
+            showToast('Failed to send move', 'error');
         }
     }
     
@@ -823,6 +828,7 @@
         state.moveHistory = [];
         state.moveCount = 0;
         state.currentPlayer = 1;
+        state.processedMoves.clear();
         clearInterval(timerInterval);
     }
     
