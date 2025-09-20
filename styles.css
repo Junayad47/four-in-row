@@ -373,7 +373,7 @@ body {
     cursor: not-allowed;
 }
 
-/* Setup sections - FIXED layout */
+/* Setup sections - ENHANCED layout */
 .setup-section {
     display: none;
     width: 100%;
@@ -381,16 +381,29 @@ body {
 
 .setup-section.active {
     display: block;
+    animation: fadeIn 0.3s ease-out;
 }
 
 .online-options {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 1rem;
-    margin: 2rem 0;
+    gap: 1.5rem;
+    margin: 2.5rem 0;
     width: 100%;
     flex-wrap: wrap;
+}
+
+.online-options .btn {
+    min-width: 160px;
+    padding: 1.2rem 2rem;
+    font-size: 1.1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.online-options .btn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 40px rgba(255,0,110,0.7);
 }
 
 .join-section,
@@ -400,42 +413,242 @@ body {
     width: 100%;
 }
 
-.join-section.active,
-.creating-section.active {
+.join-section.active {
     display: block;
+    animation: slideInFromRight 0.4s ease-out;
 }
 
+.creating-section.active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: slideInFromBottom 0.4s ease-out;
+}
+
+@keyframes slideInFromRight {
+    from {
+        transform: translateX(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideInFromBottom {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* STUNNING Room Code Display */
 .room-code-display {
-    background: rgba(0,0,0,0.8);
-    border: 2px solid var(--neon-yellow);
-    border-radius: 10px;
-    padding: 1rem;
-    margin: 1rem auto;
+    background: linear-gradient(135deg, 
+        rgba(0,0,0,0.9) 0%, 
+        rgba(26,26,46,0.9) 50%, 
+        rgba(0,0,0,0.9) 100%);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    position: relative;
+    border-radius: 20px;
+    padding: 2.5rem 3rem;
+    margin: 2rem auto;
     text-align: center;
-    max-width: 300px;
+    max-width: 400px;
+    box-shadow: 
+        0 0 60px rgba(255,255,0,0.3),
+        inset 0 0 60px rgba(255,0,110,0.1);
+}
+
+.room-code-display::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    background: linear-gradient(45deg, 
+        var(--neon-yellow), 
+        var(--neon-pink), 
+        var(--neon-cyan), 
+        var(--neon-yellow));
+    border-radius: 20px;
+    z-index: -1;
+    animation: borderRotate 3s linear infinite;
+}
+
+@keyframes borderRotate {
+    0% { 
+        filter: hue-rotate(0deg);
+    }
+    100% { 
+        filter: hue-rotate(360deg);
+    }
 }
 
 .room-code-label {
     color: var(--neon-cyan);
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 0.5rem;
+    letter-spacing: 3px;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+    text-shadow: 0 0 10px rgba(0,255,255,0.5);
 }
 
 .room-code-value {
-    font-size: 2rem;
-    font-weight: bold;
+    font-size: 3.5rem;
+    font-weight: 900;
     color: var(--neon-yellow);
-    letter-spacing: 5px;
-    text-shadow: 0 0 20px rgba(255,255,0,0.5);
+    letter-spacing: 8px;
+    text-shadow: 
+        0 0 20px rgba(255,255,0,0.8),
+        0 0 40px rgba(255,255,0,0.5),
+        0 0 60px rgba(255,255,0,0.3);
+    animation: codeGlow 2s ease-in-out infinite alternate;
+    font-family: 'Orbitron', monospace;
+    margin: 1rem 0;
+    padding: 0.5rem;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255,255,0,0.1), 
+        transparent);
+    border-radius: 10px;
 }
 
+@keyframes codeGlow {
+    from { 
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    to { 
+        transform: scale(1.05);
+        filter: brightness(1.2);
+    }
+}
+
+.room-code-display #copyCode {
+    margin-top: 1.5rem;
+    background: linear-gradient(45deg, var(--neon-cyan), var(--neon-purple));
+    padding: 0.8rem 2rem;
+    min-width: 150px;
+    position: relative;
+    overflow: hidden;
+}
+
+.room-code-display #copyCode::after {
+    content: '📋';
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.2rem;
+    opacity: 0.8;
+}
+
+.room-code-display #copyCode.success {
+    background: linear-gradient(45deg, var(--neon-green), var(--neon-cyan));
+    animation: successPulse 0.6s ease-out;
+}
+
+.room-code-display #copyCode.success::after {
+    content: '✅';
+}
+
+@keyframes successPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Enhanced Waiting Message */
 .waiting-message {
     text-align: center;
     color: var(--neon-cyan);
-    margin-top: 1rem;
-    animation: blink 1.5s infinite;
+    margin-top: 2rem;
+    font-size: 1.1rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    animation: waitingPulse 2s infinite;
+}
+
+@keyframes waitingPulse {
+    0%, 100% { 
+        opacity: 0.6;
+        transform: scale(1);
+    }
+    50% { 
+        opacity: 1;
+        transform: scale(1.05);
+    }
+}
+
+/* Enhanced Loading Spinner */
+.loading-spinner,
+.loading-spinner-large {
+    width: 60px;
+    height: 60px;
+    border: 3px solid transparent;
+    border-top: 3px solid var(--neon-cyan);
+    border-right: 3px solid var(--neon-pink);
+    border-bottom: 3px solid var(--neon-yellow);
+    border-radius: 50%;
+    animation: enhancedSpin 1s linear infinite;
+    margin: 1.5rem auto;
+    box-shadow: 
+        0 0 20px rgba(0,255,255,0.5),
+        inset 0 0 20px rgba(255,0,110,0.2);
+}
+
+.loading-spinner {
+    width: 45px;
+    height: 45px;
+}
+
+@keyframes enhancedSpin {
+    0% { 
+        transform: rotate(0deg);
+        filter: hue-rotate(0deg);
+    }
+    100% { 
+        transform: rotate(360deg);
+        filter: hue-rotate(360deg);
+    }
+}
+
+/* Creating Section Specific Styles */
+.creating-section .loading-spinner {
+    margin: 2rem auto;
+}
+
+.creating-section > * {
+    margin-bottom: 1rem;
+}
+
+/* Join Room Section Enhanced */
+.join-section.active {
+    padding: 1rem;
+    background: linear-gradient(135deg, 
+        rgba(0,0,0,0.3) 0%, 
+        rgba(26,26,46,0.3) 100%);
+    border-radius: 15px;
+    border: 1px solid rgba(0,255,255,0.2);
+}
+
+.join-section .input-group {
+    margin-bottom: 2rem;
+}
+
+.join-section #confirmJoin {
+    display: block;
+    margin: 0 auto;
+    min-width: 180px;
+    padding: 1rem 2.5rem;
 }
 
 /* Game Area */
