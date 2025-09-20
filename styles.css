@@ -1,4 +1,4 @@
-/* styles.css - Cyberpunk Watermelon Four in a Row */
+/* styles.css - Cyberpunk Watermelon Four in a Row - FIXED VERSION */
 
 /* CSS Variables */
 :root {
@@ -291,30 +291,25 @@ body {
     background: rgba(0,0,0,0.8);
 }
 
-/* Button Row - FIXED FOR INLINE DISPLAY */
-.button-row {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    margin: 2rem auto 0;
-    width: 100%;
-}
-
-.button-row .btn {
-    flex: 0 0 auto; /* Don't grow or shrink */
-    margin: 0; /* Remove any margins */
-}
-
-/* Button Container for other sections */
+/* FIXED Button Layout Styles */
 .button-container {
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 1rem;
-    margin: 2rem auto 0;
+    margin-top: 2rem;
     width: 100%;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+}
+
+.button-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+    width: 100%;
+    flex-wrap: wrap;
 }
 
 .btn {
@@ -333,81 +328,11 @@ body {
     position: relative;
     overflow: hidden;
     font-family: 'Orbitron', monospace;
-    min-width: 140px;
+    min-width: 120px;
     text-align: center;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap; /* Prevent text wrapping */
-}
-
-/* Ensure back button stays inline */
-#backFromSetup,
-#backFromOnlineSetup {
-    margin: 0; /* Remove auto margins */
-    display: inline-flex; /* Keep inline with other buttons */
-}
-
-/* Mode continue button - CENTERED */
-#continueMode {
-    margin: 0 auto;
-    display: block;
-}
-
-/* Online setup - PROPERLY CENTERED */
-.online-options {
-    display: flex;
-    gap: 1rem;
-    margin: 2rem auto;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    flex-wrap: wrap;
-}
-
-.join-section,
-.creating-section {
-    display: none;
-    margin-top: 2rem;
-    width: 100%;
-}
-
-.join-section.active,
-.creating-section.active {
-    display: block;
-}
-
-/* Center all buttons in sections */
-.join-section .btn,
-.creating-section .btn,
-.setup-section .btn {
-    margin: 1rem auto;
-    display: block;
-}
-
-/* Back button specific centering */
-#backFromOnlineSetup,
-#backFromSetup {
-    margin: 2rem auto 0;
-    display: block;
-}
-
-/* Modal content improvements */
-.modal-content {
-    background: linear-gradient(135deg, var(--card-bg), rgba(10,10,15,0.95));
-    border: 2px solid var(--neon-cyan);
-    border-radius: var(--border-radius);
-    padding: 2rem;
-    width: 100%;
-    max-width: 500px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 
-        var(--shadow-glow-cyan),
-        inset 0 0 20px rgba(255,0,110,0.1);
-    animation: slideIn 0.5s;
-    text-align: center; /* Center content */
-}
+    display: inline-block;
+    white-space: nowrap;
+    flex: 0 0 auto;
 }
 
 .btn-primary {
@@ -446,6 +371,71 @@ body {
 .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* Setup sections - FIXED layout */
+.setup-section {
+    display: none;
+    width: 100%;
+}
+
+.setup-section.active {
+    display: block;
+}
+
+.online-options {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin: 2rem 0;
+    width: 100%;
+    flex-wrap: wrap;
+}
+
+.join-section,
+.creating-section {
+    display: none;
+    margin-top: 2rem;
+    width: 100%;
+}
+
+.join-section.active,
+.creating-section.active {
+    display: block;
+}
+
+.room-code-display {
+    background: rgba(0,0,0,0.8);
+    border: 2px solid var(--neon-yellow);
+    border-radius: 10px;
+    padding: 1rem;
+    margin: 1rem auto;
+    text-align: center;
+    max-width: 300px;
+}
+
+.room-code-label {
+    color: var(--neon-cyan);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+}
+
+.room-code-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--neon-yellow);
+    letter-spacing: 5px;
+    text-shadow: 0 0 20px rgba(255,255,0,0.5);
+}
+
+.waiting-message {
+    text-align: center;
+    color: var(--neon-cyan);
+    margin-top: 1rem;
+    animation: blink 1.5s infinite;
 }
 
 /* Game Area */
@@ -695,14 +685,14 @@ body {
     opacity: 0.7;
 }
 
-/* Watermelon Discs - PROPERLY FIXED */
+/* FIXED Watermelon Discs Animation */
 .watermelon-disc {
     width: 85%;
     height: 85%;
     border-radius: 50%;
     position: relative;
     transform-style: preserve-3d;
-    /* NO animation by default */
+    /* NO animation by default - this is the key fix */
 }
 
 /* Only apply animation to discs with drop-animation class */
@@ -718,95 +708,6 @@ body {
     100% {
         transform: translateY(0) rotate(0deg) scale(1);
         opacity: 1;
-    }
-}
-
-/* Danger indicators - RESTORED */
-.cell.danger {
-    position: relative;
-    animation: dangerPulse 1s infinite;
-}
-
-.cell.danger::before {
-    content: '⚠️';
-    position: absolute;
-    top: -25px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 1.2rem;
-    z-index: 10;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-}
-
-@keyframes dangerPulse {
-    0%, 100% {
-        box-shadow: 0 0 10px rgba(255,0,0,0.5);
-        border-color: #ff4444;
-    }
-    50% {
-        box-shadow: 0 0 20px rgba(255,0,0,0.8);
-        border-color: #ff6666;
-    }
-}
-
-/* Win opportunity highlighting */
-.cell.win-opportunity {
-    animation: winOpportunityPulse 1s infinite;
-}
-
-.cell.win-opportunity::before {
-    content: '✨';
-    position: absolute;
-    top: -25px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 1.2rem;
-    z-index: 10;
-}
-
-@keyframes winOpportunityPulse {
-    0%, 100% {
-        box-shadow: 0 0 10px rgba(255,255,0,0.5);
-        border-color: var(--neon-yellow);
-    }
-    50% {
-        box-shadow: 0 0 20px rgba(255,255,0,0.8);
-        border-color: #ffff66;
-    }
-}
-
-/* Mobile optimized animation */
-@media (max-width: 768px) {
-    .watermelon-disc.animate-drop {
-        animation-duration: 0.3s;
-        animation-timing-function: ease-out;
-    }
-    
-    @keyframes dropIn {
-        from {
-            transform: translateY(-300px) scale(0.8);
-            opacity: 0;
-        }
-        to {
-            transform: translateY(0) scale(1);
-            opacity: 1;
-        }
-    }
-} 1;
-    }
-}
-
-/* Disable animations on mobile for better performance */
-@media (max-width: 768px) {
-    .watermelon-disc.new-disc {
-        animation-duration: 0.3s;
-    }
-}
-
-/* Prefers reduced motion */
-@media (prefers-reduced-motion: reduce) {
-    .watermelon-disc.new-disc {
-        animation: none;
     }
 }
 
@@ -888,6 +789,59 @@ body {
     filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5)) hue-rotate(180deg);
 }
 
+/* Danger and win indicators */
+.cell.danger {
+    position: relative;
+    animation: dangerPulse 1s infinite;
+}
+
+.cell.danger::before {
+    content: '⚠️';
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.2rem;
+    z-index: 10;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+@keyframes dangerPulse {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(255,0,0,0.5);
+        border-color: #ff4444;
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(255,0,0,0.8);
+        border-color: #ff6666;
+    }
+}
+
+.cell.win-opportunity {
+    animation: winOpportunityPulse 1s infinite;
+}
+
+.cell.win-opportunity::before {
+    content: '✨';
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.2rem;
+    z-index: 10;
+}
+
+@keyframes winOpportunityPulse {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(255,255,0,0.5);
+        border-color: var(--neon-yellow);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(255,255,0,0.8);
+        border-color: #ffff66;
+    }
+}
+
 .cell.winning {
     animation: winningPulse 1s infinite;
 }
@@ -903,10 +857,10 @@ body {
     }
 }
 
-/* Move Confirmation - PROPERLY POSITIONED */
+/* FIXED Move Confirmation Position */
 .move-confirm-strip {
     position: fixed;
-    bottom: 120px; /* Well above the control buttons */
+    bottom: 140px; /* Higher position to avoid overlap */
     left: 50%;
     transform: translateX(-50%);
     background: rgba(26,26,46,0.98);
@@ -922,36 +876,6 @@ body {
     z-index: 100;
     transition: var(--transition);
     backdrop-filter: blur(10px);
-}
-
-.move-confirm-strip.active {
-    display: flex;
-    animation: slideUpSmooth 0.3s ease-out;
-}
-
-@keyframes slideUpSmooth {
-    from { 
-        transform: translateX(-50%) translateY(20px); 
-        opacity: 0; 
-    }
-    to { 
-        transform: translateX(-50%) translateY(0); 
-        opacity: 1; 
-    }
-}
-
-@media (max-width: 768px) {
-    .move-confirm-strip {
-        bottom: 130px; /* Higher on mobile */
-        padding: 0.5rem 1rem;
-        font-size: 0.9rem;
-    }
-}
-
-@media (max-height: 700px) {
-    .move-confirm-strip {
-        bottom: 90px; /* Adjust for smaller screens */
-    }
 }
 
 .move-confirm-strip.active {
@@ -1018,15 +942,15 @@ body {
     transform: scale(1.1);
 }
 
-/* Game Controls - FIXED POSITIONING */
+/* FIXED Game Controls Layout */
 .game-controls {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 0.5rem;
+    gap: 1rem;
     margin-top: 2rem;
     flex-wrap: wrap;
-    padding-bottom: 2rem; /* Add padding to avoid overlap with confirm popup */
+    padding-bottom: 2rem;
 }
 
 .control-btn {
@@ -1038,10 +962,11 @@ body {
     cursor: pointer;
     transition: var(--transition);
     font-family: 'Orbitron', monospace;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
+    flex: 0 0 auto;
 }
 
 .control-btn:hover {
@@ -1069,6 +994,10 @@ body {
 @media (max-width: 480px) {
     .control-text {
         display: none;
+    }
+    
+    .control-btn {
+        padding: 0.75rem;
     }
 }
 
@@ -1331,71 +1260,6 @@ body {
     box-shadow: 0 0 20px rgba(0,255,136,0.5);
 }
 
-/* Setup sections - IMPROVED LAYOUT */
-.setup-section {
-    display: none;
-    text-align: center;
-}
-
-.setup-section.active {
-    display: block;
-}
-
-.setup-section .btn {
-    margin: 1rem auto;
-    display: block;
-}
-
-.online-options {
-    display: flex;
-    gap: 1rem;
-    margin: 2rem 0;
-    justify-content: center;
-}
-
-.join-section,
-.creating-section {
-    display: none;
-    margin-top: 2rem;
-}
-
-.join-section.active,
-.creating-section.active {
-    display: block;
-}
-
-.room-code-display {
-    background: rgba(0,0,0,0.8);
-    border: 2px solid var(--neon-yellow);
-    border-radius: 10px;
-    padding: 1rem;
-    margin: 1rem 0;
-    text-align: center;
-}
-
-.room-code-label {
-    color: var(--neon-cyan);
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 0.5rem;
-}
-
-.room-code-value {
-    font-size: 2rem;
-    font-weight: bold;
-    color: var(--neon-yellow);
-    letter-spacing: 5px;
-    text-shadow: 0 0 20px rgba(255,255,0,0.5);
-}
-
-.waiting-message {
-    text-align: center;
-    color: var(--neon-cyan);
-    margin-top: 1rem;
-    animation: blink 1.5s infinite;
-}
-
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     .game-container {
@@ -1411,8 +1275,8 @@ body {
     }
 
     .move-confirm-strip {
-        bottom: -50px;
-        padding: 0.4rem 0.8rem;
+        bottom: 100px; /* Adjust for mobile */
+        padding: 0.5rem 1rem;
         font-size: 0.85rem;
     }
 
@@ -1439,6 +1303,7 @@ body {
     .btn {
         padding: 0.8rem 1.5rem;
         font-size: 0.9rem;
+        min-width: 100px;
     }
 
     .player-card {
@@ -1447,6 +1312,12 @@ body {
 
     .board-container {
         padding: 0.5rem;
+    }
+}
+
+@media (max-height: 700px) {
+    .move-confirm-strip {
+        bottom: 80px; /* Adjust for smaller screens */
     }
 }
 
